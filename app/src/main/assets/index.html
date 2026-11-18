@@ -1,0 +1,2040 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <meta name="theme-color" content="#0f172a" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <title>نظام المراقبة المجدولة متعدد الشاشات | Scheduled Multi-Screen Monitoring</title>
+  <script src="https://cdn.tailwindcss.com/3.4.17"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --font-ar: 'Cairo', 'Inter', sans-serif;
+    }
+    body {
+      font-family: var(--font-ar);
+      background-color: #0b1120;
+      color: #f1f5f9;
+      overflow-x: hidden;
+    }
+    .glass-card {
+      background: rgba(15, 23, 42, 0.85);
+      border: 1px solid rgba(51, 65, 85, 0.7);
+      backdrop-filter: blur(12px);
+    }
+    .hmi-screen {
+      background: linear-gradient(145deg, #091326 0%, #0f213c 100%);
+      border: 2px solid #1e3a5f;
+      box-shadow: inset 0 0 24px rgba(14, 165, 233, 0.12);
+    }
+    .tab-btn.active {
+      background: linear-gradient(135deg, #0284c7 0%, #2563eb 100%);
+      color: #ffffff;
+      border-color: #38bdf8;
+      box-shadow: 0 4px 14px rgba(2, 132, 199, 0.35);
+    }
+    .step-dot.completed {
+      background-color: #10b981;
+      border-color: #34d399;
+      color: #022c22;
+    }
+    .step-dot.active {
+      background-color: #0284c7;
+      border-color: #38bdf8;
+      color: #ffffff;
+      box-shadow: 0 0 0 4px rgba(56, 189, 248, 0.25);
+    }
+    @media print {
+      body {
+        background: #ffffff !important;
+        color: #0f172a !important;
+      }
+      .no-print {
+        display: none !important;
+      }
+      .print-only {
+        display: block !important;
+      }
+      .glass-card {
+        background: #ffffff !important;
+        border: 1px solid #cbd5e1 !important;
+        color: #0f172a !important;
+        box-shadow: none !important;
+      }
+    }
+  </style>
+</head>
+<body class="min-h-screen flex flex-col selection:bg-sky-500 selection:text-white">
+
+  <!-- Top App Header & Status Bar -->
+  <header class="sticky top-0 z-30 bg-slate-900/95 border-b border-slate-800 backdrop-blur px-4 py-3 no-print">
+    <div class="max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-3">
+      <div class="flex items-center gap-3">
+        <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-sky-500 to-blue-700 flex items-center justify-center shadow-lg shadow-sky-500/20">
+          <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 3v2m6-2v2M9 19v2m6-2v2M5 9H3m2 6H3m18-6h-2m2 6h-2M7 19h10a2 2 0 002-2V7a2 2 0 00-2-2H7a2 2 0 00-2 2v10a2 2 0 002 2zM9 9h6v6H9V9z" />
+          </svg>
+        </div>
+        <div>
+          <div class="flex items-center gap-2">
+            <h1 class="text-base sm:text-lg font-bold text-white tracking-tight" id="appTitleText">نظام المراقبة المجدولة متعدد الشاشات</h1>
+            <span class="px-2 py-0.5 text-[11px] font-semibold rounded-full bg-sky-500/20 text-sky-300 border border-sky-500/30">v2.4 Android PWA</span>
+          </div>
+          <p class="text-xs text-slate-400" id="appSubtitleText">Scheduled Multi-Screen Injection Molding Monitoring • Haitian M01–M04</p>
+        </div>
+      </div>
+
+      <!-- Live Clock, Next Due Session & Actions -->
+      <div class="flex items-center gap-2 sm:gap-3 flex-wrap">
+        <div class="bg-slate-800/90 border border-slate-700 rounded-lg px-3 py-1.5 flex items-center gap-2 text-xs">
+          <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+          <span class="text-slate-400">الوقت الحالي:</span>
+          <span id="liveClockDisplay" class="font-mono font-bold text-white">08:12:00</span>
+          <span class="text-slate-500">|</span>
+          <span class="text-amber-300 font-semibold" id="nextSlotCountdown">الجلسة الحالية: 08:00 (فترة سماح 15 د)</span>
+        </div>
+
+        <button id="simulateReminderBtn" type="button" class="px-3 py-1.5 rounded-lg bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/40 text-xs font-semibold flex items-center gap-1.5 transition">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
+          </svg>
+          <span>محاكاة تنبيه الجلسة</span>
+        </button>
+
+        <button id="installAndroidGuideBtn" type="button" class="px-3 py-1.5 rounded-lg bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 border border-emerald-500/40 text-xs font-semibold flex items-center gap-1.5 transition">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z" />
+          </svg>
+          <span>تثبيت على أندرويد / APK</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- Navigation Tabs -->
+    <div class="max-w-7xl mx-auto mt-3 flex items-center gap-1.5 overflow-x-auto pb-1">
+      <button type="button" data-tab="dashboard" class="tab-btn active px-3.5 py-2 rounded-lg text-xs sm:text-sm font-semibold border border-slate-700 bg-slate-800/70 text-slate-300 whitespace-nowrap flex items-center gap-2 transition">
+        <span>📊 6. لوحة المراقبة (Dashboard)</span>
+      </button>
+      <button type="button" data-tab="capture" class="tab-btn px-3.5 py-2 rounded-lg text-xs sm:text-sm font-semibold border border-slate-700 bg-slate-800/70 text-slate-300 whitespace-nowrap flex items-center gap-2 transition">
+        <span>📸 2 & 3. التصوير الموجه للجلسة (Guided Capture)</span>
+        <span id="captureProgressBadge" class="px-1.5 py-0.5 text-[10px] rounded bg-amber-500/30 text-amber-200 font-mono">75%</span>
+      </button>
+      <button type="button" data-tab="schedule" class="tab-btn px-3.5 py-2 rounded-lg text-xs sm:text-sm font-semibold border border-slate-700 bg-slate-800/70 text-slate-300 whitespace-nowrap flex items-center gap-2 transition">
+        <span>⏰ 1 & 4. الجدولة والتنبيهات (2h Schedule & Alerts)</span>
+      </button>
+      <button type="button" data-tab="comparison" class="tab-btn px-3.5 py-2 rounded-lg text-xs sm:text-sm font-semibold border border-slate-700 bg-slate-800/70 text-slate-300 whitespace-nowrap flex items-center gap-2 transition">
+        <span>🔍 5. مقارنة الجلسات والانحرافات (Comparison)</span>
+      </button>
+      <button type="button" data-tab="history" class="tab-btn px-3.5 py-2 rounded-lg text-xs sm:text-sm font-semibold border border-slate-700 bg-slate-800/70 text-slate-300 whitespace-nowrap flex items-center gap-2 transition">
+        <span>🗄️ 7. السجل التاريخي والتصدير (History & Export)</span>
+      </button>
+    </div>
+  </header>
+
+  <!-- Active Notification Banner (Due / Overdue Alert) -->
+  <div id="alertBanner" class="bg-gradient-to-r from-amber-600/90 via-orange-600/90 to-red-600/90 text-white px-4 py-2.5 shadow-lg border-b border-amber-400/40 no-print">
+    <div class="max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-2 text-xs sm:text-sm">
+      <div class="flex items-center gap-2.5">
+        <span class="px-2 py-0.5 rounded bg-black/30 font-mono font-bold text-amber-200" id="alertBannerTag">تنبيه جلسة مستحقة</span>
+        <span id="alertBannerMessage" class="font-medium">جلسة المراقبة HM-001-20261117-0800 للماكينة Haitian M01 مستحقة الآن (75% مكتملة - متبقي شاشة التبريد وشاشة التلدين).</span>
+      </div>
+      <div class="flex items-center gap-2">
+        <button id="alertGoToCaptureBtn" type="button" class="px-3 py-1 rounded bg-white text-slate-900 font-bold text-xs hover:bg-slate-100 transition">استكمال التصوير الآن</button>
+        <button id="alertDismissBtn" type="button" class="px-2 py-1 rounded bg-black/25 hover:bg-black/40 text-white text-xs">إخفاء</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Main Workspace Container -->
+  <main class="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6 space-y-6">
+
+    <!-- ==================== TAB 1: MONITORING DASHBOARD (MODULE 6) ==================== -->
+    <section id="tab-dashboard" class="tab-panel space-y-6">
+      <div class="flex flex-wrap items-center justify-between gap-4">
+        <div>
+          <h2 class="text-xl font-bold text-white flex items-center gap-2">
+            <span>لوحة مراقبة الامتثال والجلسات المجدولة</span>
+            <span class="text-xs font-normal text-slate-400">(Module 6: Monitoring Dashboard)</span>
+          </h2>
+          <p class="text-xs sm:text-sm text-slate-400 mt-0.5">متابعة حية للجلسات المجدولة كل ساعتين، الصور المفقودة، قراءات الـ OCR غير المؤكدة، وحالات الانحراف عن الوصفة المعتمدة.</p>
+        </div>
+        <div class="flex items-center gap-2 flex-wrap">
+          <select id="dashboardShiftFilter" class="bg-slate-800 border border-slate-700 text-xs sm:text-sm rounded-lg px-3 py-2 text-white">
+            <option value="ALL">جميع الورديات (06:00 - 20:00)</option>
+            <option value="Shift A">الوردية الصباحية A (06:00 - 14:00)</option>
+            <option value="Shift B">الوردية المسائية B (14:00 - 20:00)</option>
+          </select>
+          <button id="dashQuickExportExcelBtn" type="button" class="px-3.5 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs sm:text-sm font-semibold flex items-center gap-1.5 shadow">
+            <span>📥 تصدير السجل (Excel)</span>
+          </button>
+          <button id="dashQuickExportPdfBtn" type="button" class="px-3.5 py-2 rounded-lg bg-rose-600 hover:bg-rose-500 text-white text-xs sm:text-sm font-semibold flex items-center gap-1.5 shadow">
+            <span>📄 تقرير رسمي (PDF)</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- 7 Required Dashboard KPIs + Completion Rate -->
+      <div class="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-3" id="dashboardKpiGrid">
+        <!-- Populated dynamically by renderDashboard() -->
+      </div>
+
+      <!-- Overall Completion Progress & Compliance Note -->
+      <div class="grid grid-cols-1 lg:grid-cols-3 gap-5">
+        <div class="lg:col-span-2 glass-card rounded-2xl p-5 space-y-4">
+          <div class="flex items-center justify-between">
+            <div>
+              <h3 class="text-sm sm:text-base font-bold text-white">جدول الجلسات اليومي (كل ساعتين: 06:00 إلى 20:00)</h3>
+              <p class="text-xs text-slate-400">اضغط على أي جلسة لفتح شاشاتها أو فحص الصور والقيم المستخرجة</p>
+            </div>
+            <div class="text-left">
+              <span class="text-xs text-slate-400 block">نسبة إتمام المراقبة الإجمالية</span>
+              <span id="overallCompletionText" class="text-lg font-extrabold text-sky-400 font-mono">82.5%</span>
+            </div>
+          </div>
+
+          <div class="w-full bg-slate-800 h-3 rounded-full overflow-hidden p-0.5 border border-slate-700">
+            <div id="overallCompletionBar" class="bg-gradient-to-r from-sky-500 via-blue-500 to-emerald-400 h-full rounded-full transition-all duration-500" style="width: 82.5%"></div>
+          </div>
+
+          <!-- Schedule Timeline Grid -->
+          <div id="scheduleTimelineGrid" class="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-1">
+            <!-- Populated by JS -->
+          </div>
+        </div>
+
+        <!-- Chart & Rule Box -->
+        <div class="glass-card rounded-2xl p-5 flex flex-col justify-between space-y-4">
+          <div>
+            <h3 class="text-sm sm:text-base font-bold text-white">توزيع حالة الجلسات والامتثال</h3>
+            <p class="text-xs text-slate-400">فصل واضح بين تاخر التصوير وانحراف المعاملات</p>
+          </div>
+          <div class="relative h-52 w-full">
+            <canvas id="complianceChart"></canvas>
+          </div>
+          <div class="p-3 rounded-xl bg-amber-500/10 border border-amber-500/30 text-xs text-amber-200 space-y-1">
+            <div class="font-bold flex items-center gap-1.5">
+              <span>⚖️ قاعدة الامتثال (البند 3 و 4):</span>
+            </div>
+            <p class="text-slate-300 leading-relaxed">
+              لا يتم اعتماد الجلسة كمطابقة (Compliant) في حال نقص أي شاشة إلزامية أو عدم تأكيد قراءة الـ OCR، كما يتم تسجيل الجلسة الفائتة كمخالفة التزام بالجدول <strong>دون تصنيفها تلقائياً كانحراف صناعي (Process Deviation)</strong>.
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Active Machines & Current Session Matrix -->
+      <div class="glass-card rounded-2xl p-5 space-y-4">
+        <div class="flex flex-wrap items-center justify-between gap-2">
+          <div>
+            <h3 class="text-sm sm:text-base font-bold text-white">حالة الجلسات التفصيلية حسب الماكينة والوردية</h3>
+            <p class="text-xs text-slate-400">يعرض حالة الشاشات الخمس الإلزامية، قراءات الـ OCR، المشغل المسؤول، والانحرافات المرصودة</p>
+          </div>
+          <button id="openNewSessionModalBtn" type="button" class="px-3 py-1.5 rounded-lg bg-sky-600 hover:bg-sky-500 text-white text-xs font-semibold">
+            + بدء جلسة مراقبة جديدة
+          </button>
+        </div>
+
+        <div class="overflow-x-auto">
+          <table class="w-full text-right text-xs sm:text-sm border-collapse">
+            <thead>
+              <tr class="border-b border-slate-700 text-slate-400 bg-slate-800/60">
+                <th class="py-3 px-3 font-semibold">معرف الجلسة (Session ID)</th>
+                <th class="py-3 px-3 font-semibold">الماكينة والقالب</th>
+                <th class="py-3 px-3 font-semibold">الموعد والوردية</th>
+                <th class="py-3 px-3 font-semibold">المشغل المسؤول</th>
+                <th class="py-3 px-3 font-semibold">الشاشات المصورة</th>
+                <th class="py-3 px-3 font-semibold">تأكيد OCR</th>
+                <th class="py-3 px-3 font-semibold">الإتمام</th>
+                <th class="py-3 px-3 font-semibold">حالة الامتثال والعملية</th>
+                <th class="py-3 px-3 font-semibold text-center">إجراء</th>
+              </tr>
+            </thead>
+            <tbody id="dashboardSessionsTableBody" class="divide-y divide-slate-800/80">
+              <!-- Populated by JS -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- ==================== TAB 2: GUIDED CAMERA CAPTURE & OCR (MODULES 2 & 3) ==================== -->
+    <section id="tab-capture" class="tab-panel hidden space-y-6">
+      <!-- Session Context Header -->
+      <div class="glass-card rounded-2xl p-5 border-r-4 border-r-sky-500">
+        <div class="flex flex-wrap items-center justify-between gap-4">
+          <div class="space-y-1">
+            <div class="flex items-center gap-2 flex-wrap">
+              <span class="px-2.5 py-0.5 rounded-md bg-sky-500/20 text-sky-300 font-mono text-xs font-bold border border-sky-500/30" id="activeSessionIdBadge">HM-001-20261117-0800</span>
+              <span id="activeSessionComplianceBadge" class="px-2.5 py-0.5 rounded-md bg-amber-500/20 text-amber-300 text-xs font-bold border border-amber-500/30">قيد الاستكمال (75% Completed)</span>
+            </div>
+            <h2 class="text-lg sm:text-xl font-bold text-white" id="activeSessionMachineTitle">Machine: Haitian M01 • Product: Plastic Bumper • Mold: Bumper Mold 01</h2>
+            <p class="text-xs text-slate-400" id="activeSessionMetaSub">Monitoring Time: 08:00 | Shift A (Morning) | Operator: م. أحمد خالد (OP-104) | Controller: Haitian Mars III (KEBA)</p>
+          </div>
+
+          <div class="flex items-center gap-2 flex-wrap">
+            <label class="text-xs text-slate-400">تبديل الجلسة النشطة:</label>
+            <select id="captureSessionSelect" class="bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-xs text-white font-mono">
+              <!-- Populated by JS -->
+            </select>
+            <button id="addExtraScreenBtn" type="button" class="px-3 py-2 rounded-lg bg-indigo-600/30 hover:bg-indigo-600/50 border border-indigo-500/40 text-indigo-200 text-xs font-semibold">
+              + إضافة شاشة إضافية (Screen 6+)
+            </button>
+          </div>
+        </div>
+
+        <!-- Step-by-Step Screen Sequence Bar (Module 3) -->
+        <div class="mt-5 pt-4 border-t border-slate-800">
+          <div class="flex items-center justify-between mb-2">
+            <span class="text-xs font-semibold text-slate-300">تسلسل الشاشات الإلزامية للجلسة (Capture Sequence & Completion Control):</span>
+            <span id="captureSequenceStatusText" class="text-xs font-mono font-bold text-amber-300">Session status: 75% completed (3/4 Mandatory Screens)</span>
+          </div>
+          <div id="screenStepperContainer" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-2.5">
+            <!-- Populated by JS -->
+          </div>
+        </div>
+      </div>
+
+      <!-- Main Guided Camera + OCR Verification Split View -->
+      <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+        <!-- Left/Right Column 1: Guided Camera & HMI Screen Preview (5 cols) -->
+        <div class="lg:col-span-5 glass-card rounded-2xl p-5 flex flex-col justify-between space-y-4">
+          <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+            <div>
+              <span class="text-[11px] uppercase tracking-wider text-sky-400 font-bold" id="currentScreenStepLabel">الشاشة المطلوبة حالياً (Screen 4 of 5)</span>
+              <h3 class="text-base sm:text-lg font-bold text-white mt-0.5" id="currentScreenTitle">4. شاشة زمن التبريد وزمن الدورة (Cooling & Cycle Time)</h3>
+            </div>
+            <span id="currentScreenStatusPill" class="px-2.5 py-1 rounded-full text-xs font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30">Pending</span>
+          </div>
+
+          <!-- Simulated / Live HMI Controller Screen Viewport -->
+          <div class="hmi-screen rounded-xl p-4 relative overflow-hidden min-h-[270px] flex flex-col justify-between">
+            <div class="flex items-center justify-between text-[11px] font-mono text-sky-300/80 border-b border-sky-900/60 pb-2">
+              <span id="hmiHeaderModel">HAITIAN MARS III - HMI CONTROLLER</span>
+              <span id="hmiHeaderTimestamp">2026-11-17 08:03:19</span>
+            </div>
+
+            <!-- Dynamic SVG / Visual Representation of the Controller Screen OR Uploaded Photo -->
+            <div id="hmiVisualCanvas" class="my-3 flex-1 flex flex-col justify-center">
+              <!-- Populated by JS with realistic HMI controller layout or uploaded image -->
+            </div>
+
+            <div class="flex items-center justify-between text-[10px] font-mono text-slate-400 border-t border-sky-900/60 pt-2">
+              <span id="hmiHashDisplay">IMG-HASH: 8F92-4C1A-B004 (Unique Verified)</span>
+              <span id="hmiDuplicationBadge" class="text-emerald-400 font-semibold">✓ لا يوجد تكرار للصورة</span>
+            </div>
+          </div>
+
+          <!-- Duplicate Screen Prevention Warning Box (Hidden unless triggered) -->
+          <div id="duplicateWarningBox" class="hidden p-3 rounded-xl bg-rose-500/20 border border-rose-500/50 text-xs text-rose-200 space-y-1">
+            <div class="font-bold text-rose-300">⚠️ تم منع تكرار الشاشة (Accidental Duplication Blocked)!</div>
+            <p id="duplicateWarningText">الصورة الملتقطة تطابق بصمة شاشة سابقة تم تصويرها في هذه الجلسة (شاشة معاملات الحقن). يرجى توجيه الكاميرا إلى الشاشة المطلوبة حالياً.</p>
+          </div>
+
+          <!-- Camera Action Controls -->
+          <div class="space-y-2.5 pt-1">
+            <div class="grid grid-cols-2 gap-2.5">
+              <!-- Native Mobile Camera Input -->
+              <label class="cursor-pointer px-3 py-2.5 rounded-xl bg-sky-600 hover:bg-sky-500 text-white text-xs sm:text-sm font-bold flex items-center justify-center gap-2 shadow-lg shadow-sky-600/25 transition">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
+                </svg>
+                <span>التقاط بالكاميرا / رفع صورة</span>
+                <input id="cameraFileInput" type="file" accept="image/*" capture="environment" class="hidden" />
+              </label>
+
+              <!-- Simulated HMI Capture + OCR Extraction -->
+              <button id="simulateCaptureOcrBtn" type="button" class="px-3 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs sm:text-sm font-bold flex items-center justify-center gap-2 shadow-lg shadow-indigo-600/25 transition">
+                <span>⚡ محاكاة تصوير واستخراج OCR</span>
+              </button>
+            </div>
+
+            <div class="grid grid-cols-2 gap-2.5">
+              <button id="retakePhotoBtn" type="button" class="px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-600 text-slate-200 text-xs font-semibold flex items-center justify-center gap-1.5 transition">
+                <span>🔄 إعادة تصوير الشاشة (Retake)</span>
+              </button>
+              <button id="testDuplicateGuardBtn" type="button" class="px-3 py-2 rounded-xl bg-rose-950/60 hover:bg-rose-900/60 border border-rose-700/50 text-rose-300 text-xs font-semibold flex items-center justify-center gap-1.5 transition">
+                <span>🛡️ اختبار مانع تكرار الشاشات</span>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Column 2: Extracted Parameters Verification & Auto-Advance (7 cols) -->
+        <div class="lg:col-span-7 glass-card rounded-2xl p-5 flex flex-col justify-between space-y-4">
+          <div class="flex flex-wrap items-center justify-between gap-2 border-b border-slate-800 pb-3">
+            <div>
+              <h3 class="text-base sm:text-lg font-bold text-white">مراجعة وتأكيد القيم المستخرجة (OCR Parameter Verification)</h3>
+              <p class="text-xs text-slate-400">قارن القيم المستخرجة مع الوصفة المعتمدة (Approved Recipe)؛ يمكنك تصحيح أي قراءة OCR قبل الاعتماد وسيتم حفظ القراءة الأصلية والتصحيح معاً.</p>
+            </div>
+            <div class="flex items-center gap-2">
+              <span class="text-xs text-slate-400">دقة OCR:</span>
+              <span class="px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 font-mono text-xs font-bold">98.6%</span>
+            </div>
+          </div>
+
+          <!-- Parameters Table -->
+          <div class="overflow-x-auto">
+            <table class="w-full text-right text-xs sm:text-sm border-collapse">
+              <thead>
+                <tr class="border-b border-slate-700 text-slate-400 bg-slate-800/60">
+                  <th class="py-2.5 px-3">المعامل (Parameter)</th>
+                  <th class="py-2.5 px-3">الوصفة المعتمدة (Recipe)</th>
+                  <th class="py-2.5 px-3">المدى المسموح (Tolerance)</th>
+                  <th class="py-2.5 px-3">قراءة OCR الخام</th>
+                  <th class="py-2.5 px-3">القيمة المؤكدة / التعديل</th>
+                  <th class="py-2.5 px-3">الحالة</th>
+                </tr>
+              </thead>
+              <tbody id="ocrParamsTableBody" class="divide-y divide-slate-800">
+                <!-- Populated dynamically by renderCaptureScreen() -->
+              </tbody>
+            </table>
+          </div>
+
+          <!-- Operator Notes & Verification Controls -->
+          <div class="space-y-3 pt-2 border-t border-slate-800">
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label class="block text-xs text-slate-400 mb-1">ملاحظات المشغل / سبب التعديل أو الانحراف (إن وجد):</label>
+                <input id="operatorScreenNoteInput" type="text" placeholder="مثال: تم التأكد من القراءة على شاشة الماكينة..." class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-xs text-white focus:border-sky-500 focus:outline-none" />
+              </div>
+              <div class="bg-slate-900/90 border border-slate-800 rounded-lg p-3 flex flex-col justify-center">
+                <div class="text-xs font-bold text-slate-300 mb-1">ملخص استكمال الجلسة (Completion Control):</div>
+                <div id="completionSummaryMiniList" class="grid grid-cols-2 gap-x-3 gap-y-1 text-[11px] font-mono">
+                  <!-- Populated by JS -->
+                </div>
+              </div>
+            </div>
+
+            <div class="flex flex-wrap items-center justify-between gap-3 pt-2">
+              <div class="flex items-center gap-2">
+                <button id="prevScreenBtn" type="button" class="px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold border border-slate-700">
+                  → الشاشة السابقة
+                </button>
+                <button id="nextScreenBtn" type="button" class="px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold border border-slate-700">
+                  الشاشة التالية ←
+                </button>
+              </div>
+
+              <button id="verifyAndAdvanceBtn" type="button" class="px-5 py-2.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white text-xs sm:text-sm font-bold shadow-lg shadow-emerald-600/25 flex items-center gap-2 transition">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+                </svg>
+                <span>تأكيد القيم والانتقال تلقائياً للشاشة التالية (Verify & Auto-Advance)</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ==================== TAB 3: SCHEDULED FREQUENCY & REMINDERS (MODULES 1 & 4) ==================== -->
+    <section id="tab-schedule" class="tab-panel hidden space-y-6">
+      <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+        <!-- Module 1: Administrator Frequency & Shift Configuration -->
+        <div class="lg:col-span-6 glass-card rounded-2xl p-5 space-y-4">
+          <div class="border-b border-slate-800 pb-3">
+            <span class="text-xs font-bold text-sky-400 uppercase">Module 1: Monitoring Frequency</span>
+            <h2 class="text-lg font-bold text-white mt-0.5">إعدادات دورية المراقبة والورديات (صلاحية المسؤول Administrator)</h2>
+            <p class="text-xs text-slate-400">الفاصل الافتراضي: كل ساعتين (06:00 - 20:00). يمكن للمسؤول تعديل الفاصل الزمني، ساعات العمل، والشاشات الإلزامية لكل ماكينة.</p>
+          </div>
+
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label class="block text-xs font-semibold text-slate-300 mb-1">الفاصل الزمني للمراقبة (Monitoring Interval):</label>
+              <select id="adminIntervalSelect" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-xs sm:text-sm text-white">
+                <option value="1">كل ساعة واحدة (Every 1 Hour)</option>
+                <option value="2" selected>كل ساعتين - افتراضي (Every 2 Hours)</option>
+                <option value="3">كل 3 ساعات (Every 3 Hours)</option>
+                <option value="4">كل 4 ساعات (Every 4 Hours)</option>
+              </select>
+            </div>
+
+            <div>
+              <label class="block text-xs font-semibold text-slate-300 mb-1">فترة السماح قبل تسجيل التأخير (Grace Period):</label>
+              <select id="adminGracePeriodSelect" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-xs sm:text-sm text-white">
+                <option value="10">10 دقائق</option>
+                <option value="15" selected>15 دقيقة (افتراضي)</option>
+                <option value="20">20 دقيقة</option>
+                <option value="30">30 دقيقة</option>
+              </select>
+            </div>
+
+            <div>
+              <label class="block text-xs font-semibold text-slate-300 mb-1">بداية ساعات العمل اليومية (Start Time):</label>
+              <input id="adminStartHourInput" type="time" value="06:00" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-xs sm:text-sm text-white font-mono" />
+            </div>
+
+            <div>
+              <label class="block text-xs font-semibold text-slate-300 mb-1">نهاية ساعات العمل اليومية (End Time):</label>
+              <input id="adminEndHourInput" type="time" value="20:00" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-xs sm:text-sm text-white font-mono" />
+            </div>
+          </div>
+
+          <div class="pt-2">
+            <button id="applyScheduleConfigBtn" type="button" class="w-full py-2.5 rounded-xl bg-sky-600 hover:bg-sky-500 text-white text-xs sm:text-sm font-bold shadow transition">
+              تحديث وتوليد جدول المراقبة حسب الإعدادات
+            </button>
+          </div>
+
+          <!-- Generated Schedule Slots Preview -->
+          <div class="bg-slate-900/90 border border-slate-800 rounded-xl p-4 space-y-2">
+            <div class="flex items-center justify-between">
+              <span class="text-xs font-bold text-slate-300">مواعيد الجلسات المجدولة النشطة:</span>
+              <span id="scheduleSlotCountBadge" class="text-xs font-mono text-sky-400">8 جلسات / يوم</span>
+            </div>
+            <div id="generatedScheduleBadges" class="flex flex-wrap gap-2 pt-1">
+              <!-- Populated by JS -->
+            </div>
+          </div>
+
+          <!-- Configurable Mandatory Screens per Machine & Controller -->
+          <div class="bg-slate-900/90 border border-slate-800 rounded-xl p-4 space-y-3">
+            <div class="flex items-center justify-between">
+              <span class="text-xs font-bold text-slate-300">تكوين الشاشات الإلزامية حسب الماكينة والطراز (Module 2):</span>
+              <select id="adminMachineConfigSelect" class="bg-slate-800 border border-slate-700 rounded px-2 py-1 text-xs text-white">
+                <option value="Haitian M01">Haitian M01 (Mars III / KEBA)</option>
+                <option value="Haitian M02">Haitian M02 (Mars II / Techmation)</option>
+              </select>
+            </div>
+            <div id="machineScreensConfigList" class="space-y-1.5 text-xs">
+              <!-- Populated by JS -->
+            </div>
+          </div>
+        </div>
+
+        <!-- Module 4: Two-Hour Monitoring Reminders & Missed Session Log -->
+        <div class="lg:col-span-6 glass-card rounded-2xl p-5 space-y-4">
+          <div class="border-b border-slate-800 pb-3 flex items-center justify-between">
+            <div>
+              <span class="text-xs font-bold text-amber-400 uppercase">Module 4: Two-Hour Monitoring Reminders</span>
+              <h2 class="text-lg font-bold text-white mt-0.5">سجل التنبيهات والجلسات الفائتة (Missed & Overdue Sessions)</h2>
+              <p class="text-xs text-slate-400">تحديد الماكينة والمشغل المسؤول عن أي جلسة متأخرة دون تصنيفها تلقائياً كانحراف صناعي.</p>
+            </div>
+            <button id="simulateOverdueBtn" type="button" class="px-3 py-1.5 rounded-lg bg-rose-600/30 hover:bg-rose-600/50 border border-rose-500/40 text-rose-200 text-xs font-semibold">
+              + محاكاة جلسة متأخرة (Overdue)
+            </button>
+          </div>
+
+          <div id="remindersLogContainer" class="space-y-3 max-h-[460px] overflow-y-auto pr-1">
+            <!-- Populated by JS -->
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ==================== TAB 4: SESSION-BASED DATA COMPARISON (MODULE 5) ==================== -->
+    <section id="tab-comparison" class="tab-panel hidden space-y-6">
+      <div class="glass-card rounded-2xl p-5 space-y-4">
+        <div class="flex flex-wrap items-center justify-between gap-4 border-b border-slate-800 pb-4">
+          <div>
+            <span class="text-xs font-bold text-sky-400 uppercase">Module 5: Session-Based Data Comparison</span>
+            <h2 class="text-lg sm:text-xl font-bold text-white mt-0.5">محرك مقارنة الجلسات وكشف الانحرافات والتغيرات غير المصرح بها</h2>
+            <p class="text-xs text-slate-400">جميع القراءات الملتقطة مجمعة تحت معرف جلسة فريد (Session ID) للمقارنة الفورية عبر 5 أبعاد تشغيلية.</p>
+          </div>
+
+          <div class="flex flex-wrap items-center gap-2">
+            <label class="text-xs text-slate-300 font-semibold">نوع المقارنة:</label>
+            <select id="comparisonModeSelect" class="bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-xs sm:text-sm text-white font-semibold">
+              <option value="prev_session">1. الجلسة الحالية مقابل الجلسة السابقة (08:00 vs 06:00)</option>
+              <option value="approved_recipe">2. الجلسة الحالية مقابل الوصفة المعتمدة (Current vs Approved Recipe)</option>
+              <option value="shifts">3. مقارنة بين ورديات الإنتاج (Shift A Morning vs Shift B Evening)</option>
+              <option value="days">4. مقارنة بين أيام الإنتاج المختلفة (2026-11-17 vs 2026-11-16)</option>
+              <option value="molds">5. مقارنة بين القوالب والمنتجات (Bumper Mold 01 vs Grille Mold 02)</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- 4 Diagnostic Detection Cards (Drift, Sudden Change, Repeated Deviations, Unauthorized Recipe Change) -->
+        <div id="comparisonFindingsGrid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+          <!-- Populated by JS -->
+        </div>
+
+        <!-- Comparison Table & Trend Chart -->
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 pt-2">
+          <div class="lg:col-span-7 overflow-x-auto">
+            <h3 class="text-sm font-bold text-white mb-2" id="comparisonTableTitle">جدول المقارنة التفصيلي للمعاملات عبر الشاشات الخمس</h3>
+            <table class="w-full text-right text-xs border-collapse">
+              <thead>
+                <tr class="border-b border-slate-700 text-slate-400 bg-slate-800/60">
+                  <th class="py-2.5 px-3">الشاشة / المعامل</th>
+                  <th class="py-2.5 px-3" id="compColHeaderA">المرجع (06:00 / الوصفة)</th>
+                  <th class="py-2.5 px-3" id="compColHeaderB">الجلسة المقارنة (08:00)</th>
+                  <th class="py-2.5 px-3">الفرق (Δ)</th>
+                  <th class="py-2.5 px-3">التشخيص الآلي (Classification)</th>
+                </tr>
+              </thead>
+              <tbody id="comparisonTableBody" class="divide-y divide-slate-800">
+                <!-- Populated by JS -->
+              </tbody>
+            </table>
+          </div>
+
+          <div class="lg:col-span-5 bg-slate-900/80 border border-slate-800 rounded-xl p-4 flex flex-col justify-between">
+            <div>
+              <h3 class="text-sm font-bold text-white">منحنى تتبع الانجراف الزمني (Parameter Drift & Spike Trend)</h3>
+              <p class="text-xs text-slate-400">يرصد الانجراف التدريجي في حرارة البرميل والتغير المفاجئ في وسادة الحقن</p>
+            </div>
+            <div class="relative h-64 w-full my-2">
+              <canvas id="driftTrendChart"></canvas>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ==================== TAB 5: HISTORICAL TRACEABILITY & EXPORT (MODULE 7) ==================== -->
+    <section id="tab-history" class="tab-panel hidden space-y-6">
+      <div class="glass-card rounded-2xl p-5 space-y-4">
+        <div class="flex flex-wrap items-center justify-between gap-4 border-b border-slate-800 pb-4">
+          <div>
+            <span class="text-xs font-bold text-emerald-400 uppercase">Module 7: Historical Traceability</span>
+            <h2 class="text-lg sm:text-xl font-bold text-white mt-0.5">السجل التاريخي غير القابل للمسح (Immutable Audit & Session Archive)</h2>
+            <p class="text-xs text-slate-400">يحتفظ كل سجل بالصور الأصلية للشاشات، القيم المستخرجة بالـ OCR، التعديلات اليدوية للمشغل، سجل الإنذارات، وبيانات المستخدم دون الكتابة فوق الجلسات السابقة.</p>
+          </div>
+          <div class="flex items-center gap-2 flex-wrap">
+            <button id="exportFullExcelBtn" type="button" class="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs sm:text-sm font-bold shadow flex items-center gap-2">
+              <span>📊 تصدير جميع الجلسات إلى Excel (.xlsx)</span>
+            </button>
+            <button id="exportFullPdfBtn" type="button" class="px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 text-white text-xs sm:text-sm font-bold shadow flex items-center gap-2">
+              <span>🖨️ تصدير تقرير المراقبة الشامل (PDF)</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- History Cards List -->
+        <div id="historicalArchiveContainer" class="space-y-4">
+          <!-- Populated by JS -->
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- Modal: Android APK & Direct Installation Guide -->
+  <div id="androidModal" class="fixed inset-0 z-50 hidden bg-black/75 backdrop-blur-sm flex items-center justify-center p-4 no-print">
+    <div class="glass-card rounded-2xl max-w-xl w-full p-6 space-y-4 border border-sky-500/40 shadow-2xl">
+      <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+        <h3 class="text-base sm:text-lg font-bold text-white flex items-center gap-2">
+          <span>📱 تثبيت التطبيق على أندرويد (PWA & Native APK Project)</span>
+        </h3>
+        <button id="closeAndroidModalBtn" type="button" class="text-slate-400 hover:text-white text-sm font-bold px-2 py-1">✕</button>
+      </div>
+      <div class="space-y-3 text-xs sm:text-sm text-slate-300 leading-relaxed">
+        <div class="p-3.5 rounded-xl bg-emerald-500/10 border border-emerald-500/30">
+          <div class="font-bold text-emerald-300 mb-1">1. التثبيت المباشر الفوري على هاتف أندرويد (بدون كابل):</div>
+          <p>افتح ملف التطبيق التفاعلي (<code class="text-sky-300">scheduled_multi_screen_monitoring.html</code>) في متصفح <strong>Google Chrome</strong> على هاتف الأندرويد، ثم اضغط على القائمة <strong>(⋮) ← الإضافة إلى الشاشة الرئيسية (Add to Home Screen / Install App)</strong> ليعمل بملء الشاشة مع دعم كاميرا الهاتف الخلفية مباشرة.</p>
+        </div>
+        <div class="p-3.5 rounded-xl bg-sky-500/10 border border-sky-500/30">
+          <div class="font-bold text-sky-300 mb-1">2. حزمة مشروع أندرويد الكاملة لبناء ملف APK (<code class="text-amber-300">HaitianMonitoring_Android_APK_Project.zip</code>):</div>
+          <p>مرفق أيضاً مشروع Android Studio متكامل يحتوي على <code class="text-sky-200">AndroidManifest.xml</code> (بصلاحيات الكاميرا والتخزين والتنبيهات)، وكود <code class="text-sky-200">MainActivity.java</code>، وملف البناء الأوتوماتيكي لتوليد ملف <code class="text-emerald-300">app-debug.apk</code> بأمر واحد (<code class="text-amber-200">gradlew assembleDebug</code>).</p>
+        </div>
+      </div>
+      <div class="flex justify-end pt-2">
+        <button id="closeAndroidModalBtn2" type="button" class="px-4 py-2 rounded-xl bg-sky-600 hover:bg-sky-500 text-white text-xs font-bold">تم الفهم</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast Notification -->
+  <div id="toastContainer" class="fixed bottom-5 left-5 z-50 hidden max-w-sm bg-slate-900 border border-sky-500/50 text-white px-4 py-3 rounded-xl shadow-2xl text-xs sm:text-sm flex items-center gap-2.5 no-print">
+    <span id="toastIcon">✅</span>
+    <span id="toastMessage" class="font-medium">تم الحفظ بنجاح</span>
+  </div>
+
+  <script>
+    // ==================== APPLICATION STATE & GROUNDED INDUSTRIAL DATA ====================
+    const APPROVED_RECIPE = {
+      recipeId: 'REC-BMP-01 (Rev 4.2)',
+      machine: 'Haitian M01',
+      controller: 'Haitian Mars III (KEBA)',
+      product: 'Plastic Bumper',
+      mold: 'Bumper Mold 01',
+      screens: [
+        {
+          screenIndex: 1,
+          id: 'SCR-INJ',
+          nameAr: 'شاشة معاملات الحقن',
+          nameEn: 'Injection parameters screen',
+          mandatory: true,
+          params: [
+            { key: 'inj_pressure_1', name: 'ضغط الحقن المرحلة 1 (Injection Pressure Stg 1)', unit: 'bar', setpoint: 115.0, tol: 5.0 },
+            { key: 'inj_speed_1', name: 'سرعة الحقن (Injection Speed)', unit: 'mm/s', setpoint: 85.0, tol: 4.0 },
+            { key: 'switchover_pos', name: 'نقطة التحول للتثبيت (V/P Switchover Pos)', unit: 'mm', setpoint: 18.5, tol: 1.0 },
+            { key: 'cushion_pos', name: 'وسادة المصهور (Melt Cushion)', unit: 'mm', setpoint: 8.2, tol: 1.2 }
+          ]
+        },
+        {
+          screenIndex: 2,
+          id: 'SCR-TEMP',
+          nameAr: 'شاشة معاملات الحرارة',
+          nameEn: 'Temperature parameters screen',
+          mandatory: true,
+          params: [
+            { key: 'nozzle_temp', name: 'حرارة الفوهة (Nozzle Temp)', unit: '°C', setpoint: 220.0, tol: 3.0 },
+            { key: 'zone1_temp', name: 'حرارة البرميل منطقة 1 (Barrel Zone 1)', unit: '°C', setpoint: 215.0, tol: 3.0 },
+            { key: 'zone2_temp', name: 'حرارة البرميل منطقة 2 (Barrel Zone 2)', unit: '°C', setpoint: 210.0, tol: 3.0 },
+            { key: 'zone3_temp', name: 'حرارة البرميل منطقة 3 (Barrel Zone 3)', unit: '°C', setpoint: 200.0, tol: 3.0 },
+            { key: 'mold_temp', name: 'حرارة مياه القالب (Mold Cooling Temp)', unit: '°C', setpoint: 45.0, tol: 2.0 }
+          ]
+        },
+        {
+          screenIndex: 3,
+          id: 'SCR-HOLD',
+          nameAr: 'شاشة ضغط وزمن التثبيت',
+          nameEn: 'Holding pressure and holding time screen',
+          mandatory: true,
+          params: [
+            { key: 'hold_pressure_1', name: 'ضغط التثبيت 1 (Holding Pressure 1)', unit: 'bar', setpoint: 65.0, tol: 3.0 },
+            { key: 'hold_pressure_2', name: 'ضغط التثبيت 2 (Holding Pressure 2)', unit: 'bar', setpoint: 50.0, tol: 3.0 },
+            { key: 'hold_time_1', name: 'زمن التثبيت 1 (Holding Time 1)', unit: 's', setpoint: 6.5, tol: 0.4 },
+            { key: 'hold_time_2', name: 'زمن التثبيت 2 (Holding Time 2)', unit: 's', setpoint: 4.0, tol: 0.3 }
+          ]
+        },
+        {
+          screenIndex: 4,
+          id: 'SCR-COOL',
+          nameAr: 'شاشة زمن التبريد وزمن الدورة',
+          nameEn: 'Cooling time and cycle time screen',
+          mandatory: true,
+          params: [
+            { key: 'cooling_time', name: 'زمن التبريد (Cooling Time)', unit: 's', setpoint: 22.0, tol: 1.0 },
+            { key: 'cycle_time', name: 'زمن الدورة الكلي (Total Cycle Time)', unit: 's', setpoint: 41.5, tol: 1.5 },
+            { key: 'mold_open_time', name: 'زمن فتح القالب (Mold Open Time)', unit: 's', setpoint: 3.2, tol: 0.3 }
+          ]
+        },
+        {
+          screenIndex: 5,
+          id: 'SCR-PLAST',
+          nameAr: 'شاشة التلدين ومعاملات الحلزون',
+          nameEn: 'Plasticizing and screw parameters screen',
+          mandatory: true,
+          params: [
+            { key: 'screw_rpm', name: 'سرعة دوران الحلزون (Screw Speed RPM)', unit: 'rpm', setpoint: 92.0, tol: 5.0 },
+            { key: 'back_pressure', name: 'الضغط الخلفي (Back Pressure)', unit: 'bar', setpoint: 12.0, tol: 1.5 },
+            { key: 'dosing_stroke', name: 'شوط التعبئة (Shot Size / Dosing Stroke)', unit: 'mm', setpoint: 145.0, tol: 1.5 },
+            { key: 'plast_time', name: 'زمن التلدين (Plasticizing Time)', unit: 's', setpoint: 9.8, tol: 0.8 }
+          ]
+        }
+      ]
+    };
+
+    const appState = {
+      activeTab: 'dashboard',
+      intervalHours: 2,
+      gracePeriodMinutes: 15,
+      workStart: '06:00',
+      workEnd: '20:00',
+      scheduleSlots: ['06:00', '08:00', '10:00', '12:00', '14:00', '16:00', '18:00', '20:00'],
+      activeSessionId: 'HM-001-20261117-0800',
+      activeScreenIdx: 3, // 0-based index -> Screen 4 (Pending) matches user prompt example (Screens 1-3 Completed, Screen 4 Pending)
+      sessions: [
+        {
+          sessionId: 'HM-001-20261117-0600',
+          machine: 'Haitian M01',
+          controller: 'Haitian Mars III (KEBA)',
+          product: 'Plastic Bumper',
+          mold: 'Bumper Mold 01',
+          timeSlot: '06:00',
+          date: '2026-11-17',
+          shift: 'Shift A',
+          operator: 'م. أحمد خالد (OP-104)',
+          sessionStatus: 'COMPLETED',
+          hasDeviation: false,
+          alarms: [],
+          auditTrail: [
+            { time: '06:04:12', user: 'OP-104', action: 'تم تصوير جميع الشاشات الخمس الإلزامية وتأكيد قراءات الـ OCR بنسبة 100%.' }
+          ],
+          screens: [
+            {
+              screenIndex: 1, id: 'SCR-INJ', nameAr: 'شاشة معاملات الحقن', nameEn: 'Injection parameters screen', mandatory: true,
+              captured: true, verified: true, capturedAt: '06:01:10', imgHash: 'HASH-0600-S1', note: 'مطابق للوصفة',
+              readings: {
+                inj_pressure_1: { ocr: 115.2, final: 115.2, corrected: false },
+                inj_speed_1: { ocr: 85.0, final: 85.0, corrected: false },
+                switchover_pos: { ocr: 18.5, final: 18.5, corrected: false },
+                cushion_pos: { ocr: 8.3, final: 8.3, corrected: false }
+              }
+            },
+            {
+              screenIndex: 2, id: 'SCR-TEMP', nameAr: 'شاشة معاملات الحرارة', nameEn: 'Temperature parameters screen', mandatory: true,
+              captured: true, verified: true, capturedAt: '06:01:55', imgHash: 'HASH-0600-S2', note: 'درجات الحرارة مستقرة',
+              readings: {
+                nozzle_temp: { ocr: 220.0, final: 220.0, corrected: false },
+                zone1_temp: { ocr: 215.1, final: 215.1, corrected: false },
+                zone2_temp: { ocr: 210.0, final: 210.0, corrected: false },
+                zone3_temp: { ocr: 200.2, final: 200.2, corrected: false },
+                mold_temp: { ocr: 45.0, final: 45.0, corrected: false }
+              }
+            },
+            {
+              screenIndex: 3, id: 'SCR-HOLD', nameAr: 'شاشة ضغط وزمن التثبيت', nameEn: 'Holding pressure and holding time screen', mandatory: true,
+              captured: true, verified: true, capturedAt: '06:02:40', imgHash: 'HASH-0600-S3', note: 'مطابق',
+              readings: {
+                hold_pressure_1: { ocr: 65.0, final: 65.0, corrected: false },
+                hold_pressure_2: { ocr: 50.0, final: 50.0, corrected: false },
+                hold_time_1: { ocr: 6.5, final: 6.5, corrected: false },
+                hold_time_2: { ocr: 4.0, final: 4.0, corrected: false }
+              }
+            },
+            {
+              screenIndex: 4, id: 'SCR-COOL', nameAr: 'شاشة زمن التبريد وزمن الدورة', nameEn: 'Cooling time and cycle time screen', mandatory: true,
+              captured: true, verified: true, capturedAt: '06:03:18', imgHash: 'HASH-0600-S4', note: 'زمن الدورة قياسي',
+              readings: {
+                cooling_time: { ocr: 22.0, final: 22.0, corrected: false },
+                cycle_time: { ocr: 41.4, final: 41.4, corrected: false },
+                mold_open_time: { ocr: 3.2, final: 3.2, corrected: false }
+              }
+            },
+            {
+              screenIndex: 5, id: 'SCR-PLAST', nameAr: 'شاشة التلدين ومعاملات الحلزون', nameEn: 'Plasticizing and screw parameters screen', mandatory: true,
+              captured: true, verified: true, capturedAt: '06:04:05', imgHash: 'HASH-0600-S5', note: 'تم التحقق',
+              readings: {
+                screw_rpm: { ocr: 92.0, final: 92.0, corrected: false },
+                back_pressure: { ocr: 12.0, final: 12.0, corrected: false },
+                dosing_stroke: { ocr: 145.0, final: 145.0, corrected: false },
+                plast_time: { ocr: 9.8, final: 9.8, corrected: false }
+              }
+            }
+          ]
+        },
+        {
+          sessionId: 'HM-001-20261117-0800',
+          machine: 'Haitian M01',
+          controller: 'Haitian Mars III (KEBA)',
+          product: 'Plastic Bumper',
+          mold: 'Bumper Mold 01',
+          timeSlot: '08:00',
+          date: '2026-11-17',
+          shift: 'Shift A',
+          operator: 'م. أحمد خالد (OP-104)',
+          sessionStatus: 'IN_PROGRESS',
+          hasDeviation: true,
+          alarms: ['ALM-204: Barrel Zone 3 Temp High Drift (+4.2°C)', 'ALM-109: Holding Pressure 1 Setpoint Changed (58.0 bar vs 65.0 bar)'],
+          auditTrail: [
+            { time: '08:01:14', user: 'OP-104', action: 'تصوير الشاشة 1 (معاملات الحقن) وتأكيد القيم.' },
+            { time: '08:02:05', user: 'OP-104', action: 'تصوير الشاشة 2 (الحرارة) مع تصحيح قراءة OCR لمنطقة 2 من 218.0 إلى 210.5 °C.' },
+            { time: '08:03:00', user: 'OP-104', action: 'تصوير الشاشة 3 (ضغط التثبيت) ورصد تغير في ضغط التثبيت 1.' }
+          ],
+          screens: [
+            {
+              screenIndex: 1, id: 'SCR-INJ', nameAr: 'شاشة معاملات الحقن', nameEn: 'Injection parameters screen', mandatory: true,
+              captured: true, verified: true, capturedAt: '08:01:14', imgHash: 'HASH-0800-S1', note: 'ارتفاع طفيف في وسادة المصهور',
+              readings: {
+                inj_pressure_1: { ocr: 118.4, final: 118.4, corrected: false },
+                inj_speed_1: { ocr: 85.5, final: 85.5, corrected: false },
+                switchover_pos: { ocr: 18.5, final: 18.5, corrected: false },
+                cushion_pos: { ocr: 11.4, final: 11.4, corrected: false }
+              }
+            },
+            {
+              screenIndex: 2, id: 'SCR-TEMP', nameAr: 'شاشة معاملات الحرارة', nameEn: 'Temperature parameters screen', mandatory: true,
+              captured: true, verified: true, capturedAt: '08:02:05', imgHash: 'HASH-0800-S2', note: 'تم تصحيح قراءة منطقة 2 يدوياً بعد انعكاس الإضاءة',
+              readings: {
+                nozzle_temp: { ocr: 221.0, final: 221.0, corrected: false },
+                zone1_temp: { ocr: 216.2, final: 216.2, corrected: false },
+                zone2_temp: { ocr: 218.0, final: 210.5, corrected: true },
+                zone3_temp: { ocr: 204.2, final: 204.2, corrected: false },
+                mold_temp: { ocr: 45.5, final: 45.5, corrected: false }
+              }
+            },
+            {
+              screenIndex: 3, id: 'SCR-HOLD', nameAr: 'شاشة ضغط وزمن التثبيت', nameEn: 'Holding pressure and holding time screen', mandatory: true,
+              captured: true, verified: true, capturedAt: '08:03:00', imgHash: 'HASH-0800-S3', note: 'انخفاض ضغط التثبيت 1 عن الوصفة',
+              readings: {
+                hold_pressure_1: { ocr: 58.0, final: 58.0, corrected: false },
+                hold_pressure_2: { ocr: 49.5, final: 49.5, corrected: false },
+                hold_time_1: { ocr: 6.5, final: 6.5, corrected: false },
+                hold_time_2: { ocr: 4.0, final: 4.0, corrected: false }
+              }
+            },
+            {
+              screenIndex: 4, id: 'SCR-COOL', nameAr: 'شاشة زمن التبريد وزمن الدورة', nameEn: 'Cooling time and cycle time screen', mandatory: true,
+              captured: false, verified: false, capturedAt: '--:--:--', imgHash: 'PENDING-0800-S4', note: '',
+              readings: {
+                cooling_time: { ocr: 22.5, final: 22.5, corrected: false },
+                cycle_time: { ocr: 43.8, final: 43.8, corrected: false },
+                mold_open_time: { ocr: 3.3, final: 3.3, corrected: false }
+              }
+            }
+          ]
+        },
+        {
+          sessionId: 'HM-002-20261117-0600',
+          machine: 'Haitian M02',
+          controller: 'Haitian Mars II (Techmation)',
+          product: 'Front Grille',
+          mold: 'Grille Mold 02',
+          timeSlot: '06:00',
+          date: '2026-11-17',
+          shift: 'Shift A',
+          operator: 'فني/ محمود السيد (OP-208)',
+          sessionStatus: 'OVERDUE_MISSED',
+          hasDeviation: false, // Rule 4: Do not automatically classify a missed reading as a process deviation!
+          alarms: ['REM-404: Missed 06:00 Session after 15m grace period (Operator OP-208 notified)'],
+          auditTrail: [
+            { time: '06:15:00', user: 'SYSTEM', action: 'تجاوز فترة السماح (15 دقيقة) دون استكمال التصوير. تم تسجيل الجلسة كفائتة (Overdue) دون تصنيفها كانحراف صناعي.' }
+          ],
+          screens: [
+            {
+              screenIndex: 1, id: 'SCR-INJ', nameAr: 'شاشة معاملات الحقن', nameEn: 'Injection parameters screen', mandatory: true,
+              captured: true, verified: false, capturedAt: '06:09:11', imgHash: 'HASH-M02-S1', note: 'تم التصوير ولم يتم تأكيد الـ OCR',
+              readings: {
+                inj_pressure_1: { ocr: 114.0, final: 114.0, corrected: false },
+                inj_speed_1: { ocr: 84.0, final: 84.0, corrected: false },
+                switchover_pos: { ocr: 18.2, final: 18.2, corrected: false },
+                cushion_pos: { ocr: 8.1, final: 8.1, corrected: false }
+              }
+            },
+            {
+              screenIndex: 2, id: 'SCR-TEMP', nameAr: 'شاشة معاملات الحرارة', nameEn: 'Temperature parameters screen', mandatory: true,
+              captured: false, verified: false, capturedAt: '--', imgHash: 'MISSING', note: '',
+              readings: {}
+            },
+            {
+              screenIndex: 3, id: 'SCR-HOLD', nameAr: 'شاشة ضغط وزمن التثبيت', nameEn: 'Holding pressure and holding time screen', mandatory: true,
+              captured: false, verified: false, capturedAt: '--', imgHash: 'MISSING', note: '',
+              readings: {}
+            },
+            {
+              screenIndex: 4, id: 'SCR-COOL', nameAr: 'شاشة زمن التبريد وزمن الدورة', nameEn: 'Cooling time and cycle time screen', mandatory: true,
+              captured: false, verified: false, capturedAt: '--', imgHash: 'MISSING', note: '',
+              readings: {}
+            },
+            {
+              screenIndex: 5, id: 'SCR-PLAST', nameAr: 'شاشة التلدين ومعاملات الحلزون', nameEn: 'Plasticizing and screw parameters screen', mandatory: true,
+              captured: false, verified: false, capturedAt: '--', imgHash: 'MISSING', note: '',
+              readings: {}
+            }
+          ]
+        },
+        {
+          sessionId: 'HM-001-20261116-1600',
+          machine: 'Haitian M01',
+          controller: 'Haitian Mars III (KEBA)',
+          product: 'Plastic Bumper',
+          mold: 'Bumper Mold 01',
+          timeSlot: '16:00',
+          date: '2026-11-16',
+          shift: 'Shift B',
+          operator: 'فني/ كريم عادل (OP-112)',
+          sessionStatus: 'COMPLETED',
+          hasDeviation: true,
+          alarms: ['ALM-301: Repeated Cycle Time Deviation (43.6s > 43.0s limit)'],
+          auditTrail: [
+            { time: '16:05:40', user: 'OP-112', action: 'اكتمال الـ 5 شاشات مع رصد زيادة متكررة في زمن الدورة.' }
+          ],
+          screens: [
+            {
+              screenIndex: 1, id: 'SCR-INJ', nameAr: 'شاشة معاملات الحقن', nameEn: 'Injection parameters screen', mandatory: true,
+              captured: true, verified: true, capturedAt: '16:01:12', imgHash: 'HASH-1600-S1', note: 'طبيعي',
+              readings: {
+                inj_pressure_1: { ocr: 116.0, final: 116.0, corrected: false },
+                inj_speed_1: { ocr: 84.5, final: 84.5, corrected: false },
+                switchover_pos: { ocr: 18.5, final: 18.5, corrected: false },
+                cushion_pos: { ocr: 8.5, final: 8.5, corrected: false }
+              }
+            },
+            {
+              screenIndex: 2, id: 'SCR-TEMP', nameAr: 'شاشة معاملات الحرارة', nameEn: 'Temperature parameters screen', mandatory: true,
+              captured: true, verified: true, capturedAt: '16:02:10', imgHash: 'HASH-1600-S2', note: 'بداية انجراف حرارة منطقة 3',
+              readings: {
+                nozzle_temp: { ocr: 220.5, final: 220.5, corrected: false },
+                zone1_temp: { ocr: 215.5, final: 215.5, corrected: false },
+                zone2_temp: { ocr: 210.2, final: 210.2, corrected: false },
+                zone3_temp: { ocr: 202.1, final: 202.1, corrected: false },
+                mold_temp: { ocr: 45.2, final: 45.2, corrected: false }
+              }
+            },
+            {
+              screenIndex: 3, id: 'SCR-HOLD', nameAr: 'شاشة ضغط وزمن التثبيت', nameEn: 'Holding pressure and holding time screen', mandatory: true,
+              captured: true, verified: true, capturedAt: '16:03:05', imgHash: 'HASH-1600-S3', note: 'مطابق',
+              readings: {
+                hold_pressure_1: { ocr: 64.8, final: 64.8, corrected: false },
+                hold_pressure_2: { ocr: 50.0, final: 50.0, corrected: false },
+                hold_time_1: { ocr: 6.5, final: 6.5, corrected: false },
+                hold_time_2: { ocr: 4.0, final: 4.0, corrected: false }
+              }
+            },
+            {
+              screenIndex: 4, id: 'SCR-COOL', nameAr: 'شاشة زمن التبريد وزمن الدورة', nameEn: 'Cooling time and cycle time screen', mandatory: true,
+              captured: true, verified: true, capturedAt: '16:04:19', imgHash: 'HASH-1600-S4', note: 'تأخر بسيط في فتح القالب',
+              readings: {
+                cooling_time: { ocr: 22.4, final: 22.4, corrected: false },
+                cycle_time: { ocr: 43.6, final: 43.6, corrected: false },
+                mold_open_time: { ocr: 3.6, final: 3.6, corrected: false }
+              }
+            },
+            {
+              screenIndex: 5, id: 'SCR-PLAST', nameAr: 'شاشة التلدين ومعاملات الحلزون', nameEn: 'Plasticizing and screw parameters screen', mandatory: true,
+              captured: true, verified: true, capturedAt: '16:05:11', imgHash: 'HASH-1600-S5', note: 'مطابق',
+              readings: {
+                screw_rpm: { ocr: 91.5, final: 91.5, corrected: false },
+                back_pressure: { ocr: 12.1, final: 12.1, corrected: false },
+                dosing_stroke: { ocr: 145.0, final: 145.0, corrected: false },
+                plast_time: { ocr: 9.9, final: 9.9, corrected: false }
+              }
+            }
+          ]
+        }
+      ],
+      reminders: [
+        {
+          id: 'REM-01',
+          type: 'DUE',
+          time: '08:00',
+          graceUntil: '08:15',
+          sessionId: 'HM-001-20261117-0800',
+          machine: 'Haitian M01',
+          operator: 'م. أحمد خالد (OP-104)',
+          status: 'ACTIVE_DUE',
+          note: 'تم إنجاز 3 شاشات من أصل 4 شاشات مفعلة في الجلسة (75% مكتملة)؛ متبقي شاشة التبريد وزمن الدورة.'
+        },
+        {
+          id: 'REM-02',
+          type: 'OVERDUE',
+          time: '06:00',
+          graceUntil: '06:15',
+          sessionId: 'HM-002-20261117-0600',
+          machine: 'Haitian M02',
+          operator: 'فني/ محمود السيد (OP-208)',
+          status: 'MISSED_RECORDED',
+          note: 'تجاوز فترة السماح (15 دقيقة). تم تسجيل الجلسة كفائتة (Overdue) وإدراجها في لوحة الامتثال دون تصنيفها كانحراف صناعي (Process Deviation).'
+        }
+      ]
+    };
+
+    let complianceChartInstance = null;
+    let driftChartInstance = null;
+
+    // ==================== HELPER FUNCTIONS ====================
+    function showToast(msg, icon = '✅') {
+      const toast = document.getElementById('toastContainer');
+      document.getElementById('toastIcon').textContent = icon;
+      document.getElementById('toastMessage').textContent = msg;
+      toast.classList.remove('hidden');
+      clearTimeout(window._toastTimer);
+      window._toastTimer = setTimeout(() => {
+        toast.classList.add('hidden');
+      }, 3800);
+    }
+
+    function getSessionCompletionStats(session) {
+      const mandatoryScreens = session.screens.filter(s => s.mandatory);
+      const completedMandatory = mandatoryScreens.filter(s => s.captured && s.verified);
+      const missingPhotos = session.screens.filter(s => s.mandatory && !s.captured).length;
+      const unverifiedOcr = session.screens.filter(s => s.captured && !s.verified).length;
+      const pct = mandatoryScreens.length > 0
+        ? Math.round((completedMandatory.length / mandatoryScreens.length) * 100)
+        : 100;
+      const isFullyCapturedAndVerified = completedMandatory.length === mandatoryScreens.length && unverifiedOcr === 0;
+      const isCompliant = isFullyCapturedAndVerified && !session.hasDeviation && session.sessionStatus !== 'OVERDUE_MISSED';
+      return {
+        mandatoryTotal: mandatoryScreens.length,
+        completedCount: completedMandatory.length,
+        missingPhotos,
+        unverifiedOcr,
+        pct,
+        isFullyCapturedAndVerified,
+        isCompliant
+      };
+    }
+
+    function switchTab(tabId) {
+      appState.activeTab = tabId;
+      document.querySelectorAll('.tab-panel').forEach(p => p.classList.add('hidden'));
+      const target = document.getElementById(`tab-${tabId}`);
+      if (target) target.classList.remove('hidden');
+
+      document.querySelectorAll('.tab-btn').forEach(btn => {
+        if (btn.getAttribute('data-tab') === tabId) {
+          btn.classList.add('active');
+        } else {
+          btn.classList.remove('active');
+        }
+      });
+
+      if (tabId === 'dashboard') renderDashboard();
+      if (tabId === 'capture') renderCaptureWorkspace();
+      if (tabId === 'schedule') renderScheduleAndReminders();
+      if (tabId === 'comparison') renderComparisonEngine();
+      if (tabId === 'history') renderHistoricalArchive();
+    }
+
+    // ==================== MODULE 6: DASHBOARD RENDERING ====================
+    function renderDashboard() {
+      const shiftFilter = document.getElementById('dashboardShiftFilter').value;
+      const filteredSessions = appState.sessions.filter(s => shiftFilter === 'ALL' || s.shift === shiftFilter);
+
+      let totalScheduled = appState.scheduleSlots.length;
+      let completedSessions = 0;
+      let overdueSessions = 0;
+      let totalMissingPhotos = 0;
+      let totalUnverifiedOcr = 0;
+      let compliantSessions = 0;
+      let deviationSessions = 0;
+      let sumPct = 0;
+
+      filteredSessions.forEach(s => {
+        const st = getSessionCompletionStats(s);
+        sumPct += st.pct;
+        if (st.isFullyCapturedAndVerified) completedSessions++;
+        if (s.sessionStatus === 'OVERDUE_MISSED') overdueSessions++;
+        totalMissingPhotos += st.missingPhotos;
+        totalUnverifiedOcr += st.unverifiedOcr;
+        if (st.isCompliant) compliantSessions++;
+        if (s.hasDeviation) deviationSessions++;
+      });
+
+      const avgCompletion = filteredSessions.length > 0 ? Math.round(sumPct / filteredSessions.length) : 0;
+      document.getElementById('overallCompletionText').textContent = `${avgCompletion}%`;
+      document.getElementById('overallCompletionBar').style.width = `${avgCompletion}%`;
+
+      const kpis = [
+        { label: 'الجلسات المجدولة', sub: 'Scheduled Sessions', val: totalScheduled, color: 'text-sky-400', border: 'border-sky-500/30' },
+        { label: 'الجلسات المكتملة', sub: 'Completed Sessions', val: completedSessions, color: 'text-emerald-400', border: 'border-emerald-500/30' },
+        { label: 'جلسات متأخرة/فائتة', sub: 'Overdue Sessions', val: overdueSessions, color: 'text-rose-400', border: 'border-rose-500/30' },
+        { label: 'صور ناقصة', sub: 'Missing Photos', val: totalMissingPhotos, color: 'text-amber-400', border: 'border-amber-500/30' },
+        { label: 'OCR غير مؤكد', sub: 'Unverified OCR', val: totalUnverifiedOcr, color: 'text-orange-400', border: 'border-orange-500/30' },
+        { label: 'جلسات مطابقة', sub: 'Compliant Sessions', val: compliantSessions, color: 'text-teal-400', border: 'border-teal-500/30' },
+        { label: 'جلسات بها انحراف', sub: 'With Deviations', val: deviationSessions, color: 'text-purple-400', border: 'border-purple-500/30' },
+        { label: 'نسبة الإتمام', sub: 'Completion Rate', val: `${avgCompletion}%`, color: 'text-blue-400', border: 'border-blue-500/30' }
+      ];
+
+      const kpiGrid = document.getElementById('dashboardKpiGrid');
+      kpiGrid.innerHTML = kpis.map(k => `
+        <div class="glass-card rounded-xl p-3.5 border ${k.border} flex flex-col justify-between">
+          <div class="text-[11px] text-slate-400 font-medium">${k.label}</div>
+          <div class="text-xl sm:text-2xl font-extrabold font-mono my-1 ${k.color}">${k.val}</div>
+          <div class="text-[10px] text-slate-500">${k.sub}</div>
+        </div>
+      `).join('');
+
+      // Timeline Grid (06:00 to 20:00)
+      const timelineGrid = document.getElementById('scheduleTimelineGrid');
+      timelineGrid.innerHTML = appState.scheduleSlots.map(slot => {
+        const sess = appState.sessions.find(s => s.date === '2026-11-17' && s.timeSlot === slot && s.machine === 'Haitian M01');
+        if (sess) {
+          const st = getSessionCompletionStats(sess);
+          const statusColor = st.isFullyCapturedAndVerified
+            ? 'bg-emerald-500/15 border-emerald-500/40 text-emerald-300'
+            : 'bg-amber-500/15 border-amber-500/40 text-amber-200';
+          return `
+            <button type="button" data-open-session="${sess.sessionId}" class="text-right p-3 rounded-xl border ${statusColor} hover:scale-[1.01] transition flex flex-col justify-between">
+              <div class="flex items-center justify-between w-full">
+                <span class="font-mono font-bold text-sm">${slot}</span>
+                <span class="text-[10px] px-1.5 py-0.5 rounded bg-black/30 font-mono">${st.pct}%</span>
+              </div>
+              <div class="text-xs font-semibold mt-1 truncate">${sess.machine} • ${sess.product}</div>
+              <div class="text-[10px] opacity-80 mt-0.5">${st.completedCount}/${st.mandatoryTotal} شاشات مؤكدة</div>
+            </button>
+          `;
+        } else {
+          const isFuture = slot > '08:00';
+          return `
+            <div class="p-3 rounded-xl border border-slate-800 bg-slate-900/50 text-slate-400 flex flex-col justify-between">
+              <div class="flex items-center justify-between w-full">
+                <span class="font-mono font-bold text-sm text-slate-300">${slot}</span>
+                <span class="text-[10px] px-1.5 py-0.5 rounded bg-slate-800 text-slate-400">${isFuture ? 'مجدولة قادمة' : 'بانتظار البدء'}</span>
+              </div>
+              <div class="text-xs mt-1">Haitian M01 • Plastic Bumper</div>
+              <div class="text-[10px] text-slate-500 mt-0.5">5 شاشات إلزامية</div>
+            </div>
+          `;
+        }
+      }).join('');
+
+      // Attach listeners to timeline cards
+      timelineGrid.querySelectorAll('[data-open-session]').forEach(btn => {
+        btn.addEventListener('click', () => {
+          appState.activeSessionId = btn.getAttribute('data-open-session');
+          switchTab('capture');
+        });
+      });
+
+      // Sessions Table
+      const tbody = document.getElementById('dashboardSessionsTableBody');
+      tbody.innerHTML = filteredSessions.map(s => {
+        const st = getSessionCompletionStats(s);
+        let statusBadge = '';
+        if (s.sessionStatus === 'OVERDUE_MISSED') {
+          statusBadge = `<span class="px-2 py-0.5 rounded bg-rose-500/20 text-rose-300 border border-rose-500/30 text-[11px] font-semibold">جلسة فائتة (Overdue - ليست انحراف عملية)</span>`;
+        } else if (!st.isFullyCapturedAndVerified) {
+          statusBadge = `<span class="px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/30 text-[11px] font-semibold">غير مكتملة (${st.missingPhotos} صور ناقصة / ${st.unverifiedOcr} غير مؤكد)</span>`;
+        } else if (s.hasDeviation) {
+          statusBadge = `<span class="px-2 py-0.5 rounded bg-purple-500/20 text-purple-300 border border-purple-500/30 text-[11px] font-semibold">مكتملة مع وجود انحراف (Deviation Detected)</span>`;
+        } else {
+          statusBadge = `<span class="px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 text-[11px] font-semibold">مطابقة بالكامل (Compliant)</span>`;
+        }
+
+        return `
+          <tr class="hover:bg-slate-800/40 transition">
+            <td class="py-3 px-3 font-mono font-bold text-sky-300">${s.sessionId}</td>
+            <td class="py-3 px-3">
+              <div class="font-semibold text-white">${s.machine}</div>
+              <div class="text-[11px] text-slate-400">${s.product} (${s.mold})</div>
+            </td>
+            <td class="py-3 px-3 font-mono text-xs">${s.date} • <strong>${s.timeSlot}</strong> (${s.shift})</td>
+            <td class="py-3 px-3 text-xs text-slate-300">${s.operator}</td>
+            <td class="py-3 px-3 font-mono text-xs">${s.screens.filter(x => x.captured).length} / ${st.mandatoryTotal}</td>
+            <td class="py-3 px-3 font-mono text-xs">${st.unverifiedOcr === 0 ? '<span class="text-emerald-400">✓ مؤكد</span>' : `<span class="text-amber-400">${st.unverifiedOcr} بانتظار التأكيد</span>`}</td>
+            <td class="py-3 px-3">
+              <div class="flex items-center gap-2">
+                <div class="w-16 bg-slate-800 h-2 rounded-full overflow-hidden">
+                  <div class="bg-sky-400 h-full" style="width:${st.pct}%"></div>
+                </div>
+                <span class="font-mono text-xs font-bold">${st.pct}%</span>
+              </div>
+            </td>
+            <td class="py-3 px-3">${statusBadge}</td>
+            <td class="py-3 px-3 text-center">
+              <button type="button" data-inspect-session="${s.sessionId}" class="px-2.5 py-1 rounded bg-sky-600/30 hover:bg-sky-600 text-sky-200 hover:text-white border border-sky-500/40 text-xs font-semibold transition">
+                فتح الجلسة
+              </button>
+            </td>
+          </tr>
+        `;
+      }).join('');
+
+      tbody.querySelectorAll('[data-inspect-session]').forEach(btn => {
+        btn.addEventListener('click', () => {
+          appState.activeSessionId = btn.getAttribute('data-inspect-session');
+          const sess = getActiveSession();
+          const firstPendingIdx = sess.screens.findIndex(x => !x.captured || !x.verified);
+          appState.activeScreenIdx = firstPendingIdx >= 0 ? firstPendingIdx : 0;
+          switchTab('capture');
+        });
+      });
+
+      renderComplianceChart(compliantSessions, deviationSessions, overdueSessions, filteredSessions.length - compliantSessions - deviationSessions - overdueSessions);
+    }
+
+    function renderComplianceChart(compliant, deviation, overdue, inProgress) {
+      const ctx = document.getElementById('complianceChart');
+      if (!ctx || typeof Chart === 'undefined') return;
+      if (complianceChartInstance) complianceChartInstance.destroy();
+      complianceChartInstance = new Chart(ctx, {
+        type: 'doughnut',
+        data: {
+          labels: ['مطابقة (Compliant)', 'بها انحراف (Deviations)', 'فائتة (Overdue)', 'قيد الاستكمال (In Progress)'],
+          datasets: [{
+            data: [compliant, deviation, overdue, Math.max(0, inProgress)],
+            backgroundColor: ['#10b981', '#a855f7', '#f43f5e', '#f59e0b'],
+            borderColor: '#0f172a',
+            borderWidth: 2
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: {
+              position: 'bottom',
+              labels: { color: '#cbd5e1', font: { family: 'Cairo', size: 11 }, boxWidth: 12 }
+            }
+          }
+        }
+      });
+    }
+
+    // ==================== MODULES 2 & 3: GUIDED CAPTURE & COMPLETION CONTROL ====================
+    function getActiveSession() {
+      return appState.sessions.find(s => s.sessionId === appState.activeSessionId) || appState.sessions[0];
+    }
+
+    function renderCaptureWorkspace() {
+      const session = getActiveSession();
+      const stats = getSessionCompletionStats(session);
+
+      // Populate selector
+      const select = document.getElementById('captureSessionSelect');
+      select.innerHTML = appState.sessions.map(s =>
+        `<option value="${s.sessionId}" ${s.sessionId === session.sessionId ? 'selected' : ''}>${s.sessionId} (${s.machine} - ${s.timeSlot})</option>`
+      ).join('');
+
+      document.getElementById('activeSessionIdBadge').textContent = `Session ID: ${session.sessionId}`;
+      document.getElementById('activeSessionMachineTitle').textContent = `Machine: ${session.machine} • Product: ${session.product} • Mold: ${session.mold}`;
+      document.getElementById('activeSessionMetaSub').textContent = `Monitoring time: ${session.timeSlot} | Date: ${session.date} | Operator: ${session.operator} | Controller: ${session.controller}`;
+
+      const badge = document.getElementById('activeSessionComplianceBadge');
+      const topBadge = document.getElementById('captureProgressBadge');
+      topBadge.textContent = `${stats.pct}%`;
+
+      if (stats.isFullyCapturedAndVerified) {
+        badge.className = 'px-2.5 py-0.5 rounded-md bg-emerald-500/20 text-emerald-300 text-xs font-bold border border-emerald-500/30';
+        badge.textContent = session.hasDeviation ? `100% مكتملة (توجد انحرافات مسجلة)` : `100% مكتملة ومطابقة (Compliant)`;
+      } else {
+        badge.className = 'px-2.5 py-0.5 rounded-md bg-amber-500/20 text-amber-300 text-xs font-bold border border-amber-500/30';
+        badge.textContent = `Session status: ${stats.pct}% completed (غير مطابقة حتى اكتمال وتأكيد جميع الشاشات)`;
+      }
+
+      document.getElementById('captureSequenceStatusText').textContent =
+        `Session status: ${stats.pct}% completed (${stats.completedCount}/${stats.mandatoryTotal} Mandatory Screens Verified)`;
+
+      // Clamp activeScreenIdx
+      if (appState.activeScreenIdx >= session.screens.length) appState.activeScreenIdx = 0;
+      const currentScreen = session.screens[appState.activeScreenIdx];
+
+      // Render Stepper
+      const stepper = document.getElementById('screenStepperContainer');
+      stepper.innerHTML = session.screens.map((scr, idx) => {
+        const isDone = scr.captured && scr.verified;
+        const isCurrent = idx === appState.activeScreenIdx;
+        let cardCls = 'border-slate-800 bg-slate-900/60 text-slate-400';
+        let statusLabel = 'Pending';
+        let statusColor = 'text-amber-400';
+        if (isDone) {
+          cardCls = 'border-emerald-500/40 bg-emerald-500/10 text-emerald-200';
+          statusLabel = 'Completed';
+          statusColor = 'text-emerald-400';
+        } else if (scr.captured && !scr.verified) {
+          cardCls = 'border-orange-500/40 bg-orange-500/10 text-orange-200';
+          statusLabel = 'Unverified OCR';
+          statusColor = 'text-orange-400';
+        }
+        if (isCurrent) {
+          cardCls += ' ring-2 ring-sky-400';
+        }
+        return `
+          <button type="button" data-step-idx="${idx}" class="p-2.5 rounded-xl border ${cardCls} text-right transition flex flex-col justify-between">
+            <div class="flex items-center justify-between w-full">
+              <span class="text-[11px] font-mono font-bold">Screen ${scr.screenIndex}</span>
+              <span class="text-[10px] font-mono font-bold ${statusColor}">${statusLabel}</span>
+            </div>
+            <div class="text-xs font-bold text-white mt-1 truncate">${scr.nameAr}</div>
+            <div class="text-[10px] text-slate-400 truncate">${scr.nameEn}</div>
+          </button>
+        `;
+      }).join('');
+
+      stepper.querySelectorAll('[data-step-idx]').forEach(btn => {
+        btn.addEventListener('click', () => {
+          appState.activeScreenIdx = parseInt(btn.getAttribute('data-step-idx'), 10);
+          document.getElementById('duplicateWarningBox').classList.add('hidden');
+          renderCaptureWorkspace();
+        });
+      });
+
+      // Render Current Screen Details
+      document.getElementById('currentScreenStepLabel').textContent =
+        `الشاشة المطلوبة حالياً (Screen ${currentScreen.screenIndex} of ${session.screens.length}) ${currentScreen.mandatory ? '• إلزامية' : '• إضافية اختيارية'}`;
+      document.getElementById('currentScreenTitle').textContent = `${currentScreen.screenIndex}. ${currentScreen.nameAr} (${currentScreen.nameEn})`;
+
+      const pill = document.getElementById('currentScreenStatusPill');
+      if (currentScreen.captured && currentScreen.verified) {
+        pill.className = 'px-2.5 py-1 rounded-full text-xs font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30';
+        pill.textContent = 'Completed ✓';
+      } else if (currentScreen.captured && !currentScreen.verified) {
+        pill.className = 'px-2.5 py-1 rounded-full text-xs font-bold bg-orange-500/20 text-orange-300 border border-orange-500/30';
+        pill.textContent = 'Captured (Verify OCR)';
+      } else {
+        pill.className = 'px-2.5 py-1 rounded-full text-xs font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30';
+        pill.textContent = 'Pending';
+      }
+
+      document.getElementById('hmiHeaderModel').textContent = `${session.controller.toUpperCase()} • ${currentScreen.id}`;
+      document.getElementById('hmiHeaderTimestamp').textContent = `${session.date} ${currentScreen.capturedAt !== '--:--:--' ? currentScreen.capturedAt : 'LIVE CAMERA'}`;
+      document.getElementById('hmiHashDisplay').textContent = `IMG-HASH: ${currentScreen.imgHash}`;
+      document.getElementById('operatorScreenNoteInput').value = currentScreen.note || '';
+
+      // Render HMI Visual Canvas & OCR Table
+      const recipeScreen = APPROVED_RECIPE.screens.find(r => r.id === currentScreen.id) || {
+        params: [
+          { key: 'aux_param_1', name: 'ضغط طرد المنتج (Ejector Pressure)', unit: 'bar', setpoint: 45.0, tol: 5.0 },
+          { key: 'aux_param_2', name: 'شوط الطرد (Ejector Stroke)', unit: 'mm', setpoint: 60.0, tol: 2.0 }
+        ]
+      };
+
+      const hmiCanvas = document.getElementById('hmiVisualCanvas');
+      if (currentScreen.customImageDataUrl) {
+        hmiCanvas.innerHTML = `
+          <div class="relative rounded-lg overflow-hidden border border-sky-500/40 bg-black flex items-center justify-center max-h-52">
+            <img src="${currentScreen.customImageDataUrl}" alt="Captured HMI Screen" class="max-w-full max-h-52 object-contain" />
+            <span class="absolute bottom-2 right-2 px-2 py-0.5 rounded bg-black/75 text-[10px] text-emerald-300 font-mono">صورة الكاميرا الملتقطة</span>
+          </div>
+        `;
+      } else {
+        hmiCanvas.innerHTML = `
+          <div class="space-y-2">
+            <div class="flex items-center justify-between bg-sky-950/70 border border-sky-800/60 rounded px-2.5 py-1.5 text-xs">
+              <span class="font-bold text-sky-200">${currentScreen.nameEn}</span>
+              <span class="font-mono text-[11px] ${currentScreen.captured ? 'text-emerald-400' : 'text-amber-300'}">
+                ${currentScreen.captured ? '● PHOTO CAPTURED' : '○ AWAITING SHUTTER'}
+              </span>
+            </div>
+            <div class="grid grid-cols-2 gap-2">
+              ${recipeScreen.params.map(p => {
+                const rObj = (currentScreen.readings && currentScreen.readings[p.key]) || { ocr: p.setpoint, final: p.setpoint };
+                const val = rObj.final !== undefined ? rObj.final : p.setpoint;
+                const isOut = Math.abs(val - p.setpoint) > p.tol;
+                return `
+                  <div class="bg-slate-950/80 border ${isOut ? 'border-rose-500/60' : 'border-slate-800'} rounded p-2">
+                    <div class="text-[10px] text-slate-400 truncate">${p.name}</div>
+                    <div class="flex items-baseline justify-between mt-1">
+                      <span class="text-sm font-mono font-bold ${isOut ? 'text-rose-400' : 'text-emerald-300'}">${val} <small class="text-[10px] text-slate-400">${p.unit}</small></span>
+                      <span class="text-[10px] font-mono text-slate-500">SP: ${p.setpoint}</span>
+                    </div>
+                  </div>
+                `;
+              }).join('')}
+            </div>
+          </div>
+        `;
+      }
+
+      // Render OCR Table
+      const ocrTbody = document.getElementById('ocrParamsTableBody');
+      ocrTbody.innerHTML = recipeScreen.params.map(p => {
+        if (!currentScreen.readings[p.key]) {
+          currentScreen.readings[p.key] = { ocr: p.setpoint, final: p.setpoint, corrected: false };
+        }
+        const r = currentScreen.readings[p.key];
+        const diff = Math.abs(r.final - p.setpoint);
+        const isOut = diff > p.tol;
+        return `
+          <tr class="hover:bg-slate-800/30">
+            <td class="py-2.5 px-3 font-medium text-white">${p.name}</td>
+            <td class="py-2.5 px-3 font-mono text-slate-300">${p.setpoint} ${p.unit}</td>
+            <td class="py-2.5 px-3 font-mono text-xs text-slate-400">±${p.tol} ${p.unit}</td>
+            <td class="py-2.5 px-3 font-mono text-sky-300">${r.ocr} ${p.unit}</td>
+            <td class="py-2.5 px-3">
+              <div class="flex items-center gap-1.5">
+                <input type="number" step="0.1" data-param-key="${p.key}" value="${r.final}" class="ocr-val-input w-24 bg-slate-900 border ${r.corrected ? 'border-amber-400' : 'border-slate-700'} rounded px-2 py-1 text-xs font-mono text-white" />
+                <span class="text-xs text-slate-400">${p.unit}</span>
+                ${r.corrected ? '<span class="text-[10px] px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300">معدل يدوياً</span>' : ''}
+              </div>
+            </td>
+            <td class="py-2.5 px-3">
+              ${isOut
+                ? `<span class="px-2 py-0.5 rounded bg-rose-500/20 text-rose-300 border border-rose-500/30 text-[11px] font-semibold">خارج المدى (${(r.final - p.setpoint > 0 ? '+' : '') + (r.final - p.setpoint).toFixed(1)})</span>`
+                : `<span class="px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 text-[11px] font-semibold">مطابق للوصفة</span>`
+              }
+            </td>
+          </tr>
+        `;
+      }).join('');
+
+      ocrTbody.querySelectorAll('.ocr-val-input').forEach(inp => {
+        inp.addEventListener('input', (e) => {
+          const key = e.target.getAttribute('data-param-key');
+          const num = parseFloat(e.target.value);
+          if (!isNaN(num)) {
+            currentScreen.readings[key].final = num;
+            currentScreen.readings[key].corrected = (num !== currentScreen.readings[key].ocr);
+          }
+        });
+      });
+
+      // Mini completion list matching prompt example
+      const miniList = document.getElementById('completionSummaryMiniList');
+      miniList.innerHTML = session.screens.map(s => {
+        const done = s.captured && s.verified;
+        return `<div class="${done ? 'text-emerald-400' : 'text-amber-300'}">Screen ${s.screenIndex}: ${done ? 'Completed.' : 'Pending.'}</div>`;
+      }).join('');
+    }
+
+    // ==================== MODULES 1 & 4: SCHEDULE & REMINDERS ====================
+    function renderScheduleAndReminders() {
+      const badges = document.getElementById('generatedScheduleBadges');
+      document.getElementById('scheduleSlotCountBadge').textContent = `${appState.scheduleSlots.length} جلسات / يوم`;
+      badges.innerHTML = appState.scheduleSlots.map(slot => `
+        <span class="px-3 py-1.5 rounded-lg bg-slate-800 border border-sky-500/30 text-sky-300 font-mono text-xs font-bold flex items-center gap-1.5">
+          <span>🕒 ${slot}</span>
+        </span>
+      `).join('');
+
+      const machineScreensList = document.getElementById('machineScreensConfigList');
+      machineScreensList.innerHTML = APPROVED_RECIPE.screens.map(scr => `
+        <div class="flex items-center justify-between p-2 rounded-lg bg-slate-800/60 border border-slate-700/70">
+          <div>
+            <span class="font-bold text-white">${scr.screenIndex}. ${scr.nameAr}</span>
+            <span class="text-slate-400 mx-1">(${scr.nameEn})</span>
+          </div>
+          <span class="px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 text-[11px] font-semibold">إلزامية (Mandatory)</span>
+        </div>
+      `).join('');
+
+      const remList = document.getElementById('remindersLogContainer');
+      remList.innerHTML = appState.reminders.map(r => {
+        const isOverdue = r.type === 'OVERDUE';
+        return `
+          <div class="p-4 rounded-xl border ${isOverdue ? 'bg-rose-950/30 border-rose-500/40' : 'bg-amber-950/30 border-amber-500/40'} space-y-2">
+            <div class="flex items-center justify-between">
+              <span class="px-2 py-0.5 rounded text-[11px] font-bold ${isOverdue ? 'bg-rose-500/30 text-rose-200' : 'bg-amber-500/30 text-amber-200'}">
+                ${isOverdue ? '⚠️ تنبيه تجاوز المهلة (Overdue Session Recorded)' : '🔔 تنبيه جلسة مستحقة (Due Session Notification)'}
+              </span>
+              <span class="font-mono text-xs text-slate-300">الموعد: ${r.time} (مهلة السماح حتى ${r.graceUntil})</span>
+            </div>
+            <div class="text-xs sm:text-sm font-bold text-white">
+              الماكينة: ${r.machine} • الجلسة: <span class="font-mono text-sky-300">${r.sessionId}</span>
+            </div>
+            <div class="text-xs text-slate-300">المشغل المسؤول: <strong>${r.operator}</strong></div>
+            <p class="text-xs text-slate-400 leading-relaxed">${r.note}</p>
+          </div>
+        `;
+      }).join('');
+    }
+
+    // ==================== MODULE 5: SESSION-BASED DATA COMPARISON ====================
+    function renderComparisonEngine() {
+      const mode = document.getElementById('comparisonModeSelect').value;
+
+      const findings = [
+        {
+          title: 'انجراف تدريجي للمعاملات (Parameter Drift)',
+          status: 'تم رصد انجراف حراري',
+          detail: 'حرارة البرميل منطقة 3 (Zone 3) ارتفعت تدريجياً من 200.2°C (06:00) إلى 204.2°C (08:00) متجاوزة سقف السماحية (203.0°C).',
+          color: 'border-amber-500/40 bg-amber-500/10 text-amber-300'
+        },
+        {
+          title: 'تغير مفاجئ (Sudden Changes)',
+          status: 'قفزة في وسادة المصهور',
+          detail: 'وسادة المصهور (Melt Cushion) قفزت فجأة من 8.3 مم في جلسة 06:00 إلى 11.4 مم في جلسة 08:00 (+3.1 مم).',
+          color: 'border-rose-500/40 bg-rose-500/10 text-rose-300'
+        },
+        {
+          title: 'انحرافات متكررة (Repeated Deviations)',
+          status: 'تكرار تجاوز زمن الدورة',
+          detail: 'زمن الدورة الكلي تجاوز الحد الأعلى (43.0 ثانية) في جلستين متتاليتين (43.6 ثانية و43.8 ثانية).',
+          color: 'border-purple-500/40 bg-purple-500/10 text-purple-300'
+        },
+        {
+          title: 'تغيير غير مصرح به في الوصفة (Unauthorized Recipe Change)',
+          status: 'تعديل ضغط التثبيت 1',
+          detail: 'ضغط التثبيت 1 (Holding Pressure 1) تم تغييره إلى 58.0 bar بدلاً من الوصفة المعتمدة (65.0 bar) دون اعتماد هندسي.',
+          color: 'border-red-500/50 bg-red-500/15 text-red-300'
+        }
+      ];
+
+      document.getElementById('comparisonFindingsGrid').innerHTML = findings.map(f => `
+        <div class="p-3.5 rounded-xl border ${f.color} space-y-1.5">
+          <div class="text-xs font-bold">${f.title}</div>
+          <div class="text-sm font-extrabold text-white">${f.status}</div>
+          <p class="text-[11px] text-slate-300 leading-relaxed">${f.detail}</p>
+        </div>
+      `).join('');
+
+      let headerA = 'جلسة 06:00 (HM-001-20261117-0600)';
+      let headerB = 'جلسة 08:00 (HM-001-20261117-0800)';
+      let rows = [
+        { screen: '1. الحقن (Injection)', param: 'ضغط الحقن 1 (bar)', a: 115.2, b: 118.4, diag: 'ضمن المدى المسموح (±5 bar)', badge: 'bg-emerald-500/20 text-emerald-300' },
+        { screen: '1. الحقن (Injection)', param: 'وسادة المصهور Cushion (mm)', a: 8.3, b: 11.4, diag: 'تغير مفاجئ (Sudden Change +3.1 mm)', badge: 'bg-rose-500/20 text-rose-300' },
+        { screen: '2. الحرارة (Temperature)', param: 'حرارة منطقة 3 Zone 3 (°C)', a: 200.2, b: 204.2, diag: 'انجراف تدريجي (Parameter Drift +4.0°C)', badge: 'bg-amber-500/20 text-amber-300' },
+        { screen: '3. التثبيت (Holding)', param: 'ضغط التثبيت 1 (bar)', a: 65.0, b: 58.0, diag: 'تغيير غير مصرح به في الوصفة (Unauthorized Change)', badge: 'bg-red-500/20 text-red-300' },
+        { screen: '4. التبريد والدورة (Cooling)', param: 'زمن الدورة الكلي (s)', a: 41.4, b: 43.8, diag: 'انحراف متكرر (Repeated Deviation > 43.0s)', badge: 'bg-purple-500/20 text-purple-300' },
+        { screen: '5. التلدين (Plasticizing)', param: 'سرعة الحلزون (rpm)', a: 92.0, b: 92.0, diag: 'مستقر ومطابق', badge: 'bg-emerald-500/20 text-emerald-300' }
+      ];
+
+      if (mode === 'approved_recipe') {
+        headerA = 'الوصفة المعتمدة (REC-BMP-01)';
+        headerB = 'الجلسة الحالية (HM-001-20261117-0800)';
+        rows[0].a = 115.0;
+        rows[1].a = 8.2;
+        rows[2].a = 200.0;
+        rows[4].a = 41.5;
+      } else if (mode === 'shifts') {
+        headerA = 'الوردية الصباحية Shift A (متوسط 06:00-08:00)';
+        headerB = 'الوردية المسائية Shift B (جلسة 16:00)';
+        rows[1].b = 8.5;
+        rows[2].b = 202.1;
+        rows[3].b = 64.8;
+        rows[4].b = 43.6;
+      } else if (mode === 'days') {
+        headerA = 'إنتاج أمس 2026-11-16 (HM-001-20261116-1600)';
+        headerB = 'إنتاج اليوم 2026-11-17 (HM-001-20261117-0800)';
+        rows[1].a = 8.5;
+        rows[2].a = 202.1;
+        rows[4].a = 43.6;
+      } else if (mode === 'molds') {
+        headerA = 'Plastic Bumper (Bumper Mold 01)';
+        headerB = 'Front Grille (Grille Mold 02)';
+        rows[0].b = 114.0;
+        rows[1].b = 8.1;
+      }
+
+      document.getElementById('compColHeaderA').textContent = headerA;
+      document.getElementById('compColHeaderB').textContent = headerB;
+
+      document.getElementById('comparisonTableBody').innerHTML = rows.map(r => {
+        const delta = (r.b - r.a).toFixed(1);
+        const sign = (r.b - r.a) > 0 ? '+' : '';
+        return `
+          <tr class="hover:bg-slate-800/40">
+            <td class="py-2.5 px-3">
+              <div class="font-bold text-white">${r.param}</div>
+              <div class="text-[10px] text-slate-400">${r.screen}</div>
+            </td>
+            <td class="py-2.5 px-3 font-mono text-slate-300">${r.a}</td>
+            <td class="py-2.5 px-3 font-mono font-bold text-sky-300">${r.b}</td>
+            <td class="py-2.5 px-3 font-mono font-bold ${Math.abs(r.b - r.a) > 2 ? 'text-rose-400' : 'text-emerald-400'}">${sign}${delta}</td>
+            <td class="py-2.5 px-3"><span class="px-2 py-0.5 rounded text-[11px] font-semibold ${r.badge}">${r.diag}</span></td>
+          </tr>
+        `;
+      }).join('');
+
+      renderDriftChart();
+    }
+
+    function renderDriftChart() {
+      const ctx = document.getElementById('driftTrendChart');
+      if (!ctx || typeof Chart === 'undefined') return;
+      if (driftChartInstance) driftChartInstance.destroy();
+      driftChartInstance = new Chart(ctx, {
+        type: 'line',
+        data: {
+          labels: ['الوصفة', '16:00 (أمس)', '06:00 (اليوم)', '08:00 (الحالية)'],
+          datasets: [
+            {
+              label: 'حرارة منطقة 3 (°C) - انجراف تدريجي',
+              data: [200.0, 202.1, 200.2, 204.2],
+              borderColor: '#f59e0b',
+              backgroundColor: 'rgba(245, 158, 11, 0.15)',
+              tension: 0.3,
+              fill: true
+            },
+            {
+              label: 'ضغط التثبيت 1 (bar) - تغيير غير مصرح',
+              data: [65.0, 64.8, 65.0, 58.0],
+              borderColor: '#f43f5e',
+              backgroundColor: 'rgba(244, 63, 94, 0.1)',
+              tension: 0.2
+            }
+          ]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          scales: {
+            x: { ticks: { color: '#94a3b8', font: { family: 'Cairo', size: 10 } }, grid: { color: '#1e293b' } },
+            y: { ticks: { color: '#94a3b8' }, grid: { color: '#1e293b' } }
+          },
+          plugins: {
+            legend: { labels: { color: '#e2e8f0', font: { family: 'Cairo', size: 11 } } }
+          }
+        }
+      });
+    }
+
+    // ==================== MODULE 7: HISTORICAL TRACEABILITY & EXPORT ====================
+    function renderHistoricalArchive() {
+      const container = document.getElementById('historicalArchiveContainer');
+      container.innerHTML = appState.sessions.map(s => {
+        const st = getSessionCompletionStats(s);
+        return `
+          <div class="p-4 rounded-xl bg-slate-900/90 border border-slate-800 space-y-3">
+            <div class="flex flex-wrap items-center justify-between gap-2 border-b border-slate-800 pb-2.5">
+              <div>
+                <span class="font-mono font-bold text-sm text-sky-400">${s.sessionId}</span>
+                <span class="mx-2 text-slate-600">|</span>
+                <span class="text-xs font-bold text-white">${s.machine} • ${s.product} (${s.mold})</span>
+              </div>
+              <div class="flex items-center gap-2">
+                <span class="text-xs text-slate-400 font-mono">${s.date} ${s.timeSlot} (${s.shift})</span>
+                <span class="px-2 py-0.5 rounded text-[11px] font-bold bg-slate-800 text-sky-300 font-mono">الإتمام: ${st.pct}%</span>
+              </div>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
+              <div class="space-y-1">
+                <div class="font-bold text-slate-300">👤 بيانات المشغل وسجل التدقيق (Audit Trail - Non-Overwritable):</div>
+                <div class="text-slate-400">المشغل المسؤول: <strong class="text-white">${s.operator}</strong></div>
+                <ul class="space-y-1 text-[11px] text-slate-300 mt-1">
+                  ${s.auditTrail.map(a => `<li class="font-mono">• [${a.time}] (${a.user}): ${a.action}</li>`).join('')}
+                </ul>
+              </div>
+              <div class="space-y-1">
+                <div class="font-bold text-slate-300">🚨 الإنذارات وبصمات الصور الأصلية (Original Photos & Alarms):</div>
+                <div class="flex flex-wrap gap-1.5 mt-1">
+                  ${s.screens.map(scr => `
+                    <span class="px-2 py-0.5 rounded border text-[10px] font-mono ${scr.captured ? 'border-emerald-500/40 bg-emerald-500/10 text-emerald-300' : 'border-slate-700 bg-slate-800 text-slate-400'}">
+                      S${scr.screenIndex}: ${scr.imgHash} ${scr.verified ? '✓' : ''}
+                    </span>
+                  `).join('')}
+                </div>
+                <div class="mt-2 space-y-1">
+                  ${s.alarms.length > 0
+                    ? s.alarms.map(al => `<div class="text-[11px] text-rose-300 bg-rose-500/10 border border-rose-500/30 rounded px-2 py-1 font-mono">⚠️ ${al}</div>`).join('')
+                    : `<div class="text-[11px] text-emerald-400">✓ لا توجد إنذارات مسجلة في هذه الجلسة</div>`
+                  }
+                </div>
+              </div>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    function exportSessionsToExcel() {
+      const rows = [];
+      appState.sessions.forEach(s => {
+        const st = getSessionCompletionStats(s);
+        s.screens.forEach(scr => {
+          const rKeys = Object.keys(scr.readings || {});
+          if (rKeys.length === 0) {
+            rows.push({
+              'Session ID': s.sessionId,
+              'Date': s.date,
+              'Monitoring Time': s.timeSlot,
+              'Shift': s.shift,
+              'Machine': s.machine,
+              'Product': s.product,
+              'Mold': s.mold,
+              'Operator': s.operator,
+              'Screen #': scr.screenIndex,
+              'Screen Name': scr.nameEn,
+              'Screen Captured': scr.captured ? 'Yes' : 'No',
+              'OCR Verified': scr.verified ? 'Yes' : 'No',
+              'Image Hash': scr.imgHash,
+              'Parameter': 'N/A (Missing Screen)',
+              'OCR Extracted': '',
+              'Verified Value': '',
+              'Manual Correction': '',
+              'Session Completion %': `${st.pct}%`,
+              'Alarms': (s.alarms || []).join('; ')
+            });
+          } else {
+            rKeys.forEach(k => {
+              const rv = scr.readings[k];
+              rows.push({
+                'Session ID': s.sessionId,
+                'Date': s.date,
+                'Monitoring Time': s.timeSlot,
+                'Shift': s.shift,
+                'Machine': s.machine,
+                'Product': s.product,
+                'Mold': s.mold,
+                'Operator': s.operator,
+                'Screen #': scr.screenIndex,
+                'Screen Name': scr.nameEn,
+                'Screen Captured': scr.captured ? 'Yes' : 'No',
+                'OCR Verified': scr.verified ? 'Yes' : 'No',
+                'Image Hash': scr.imgHash,
+                'Parameter': k,
+                'OCR Extracted': rv.ocr,
+                'Verified Value': rv.final,
+                'Manual Correction': rv.corrected ? 'Corrected by Operator' : 'Original OCR',
+                'Session Completion %': `${st.pct}%`,
+                'Alarms': (s.alarms || []).join('; ')
+              });
+            });
+          }
+        });
+      });
+
+      if (typeof XLSX !== 'undefined') {
+        const ws = XLSX.utils.json_to_sheet(rows);
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, 'Monitoring_Sessions');
+        XLSX.writeFile(wb, 'Scheduled_Multi_Screen_Monitoring_History.xlsx');
+        showToast('تم تصدير السجل الكامل للجلسات بصيغة Excel (.xlsx) بنجاح!');
+      } else {
+        // Fallback CSV download
+        const headers = Object.keys(rows[0]);
+        const csv = [headers.join(','), ...rows.map(r => headers.map(h => `"${String(r[h] || '').replace(/"/g, '""')}"`).join(','))].join('\n');
+        const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = 'Scheduled_Multi_Screen_Monitoring_History.csv';
+        a.click();
+        showToast('تم تصدير السجل بصيغة CSV قابلة للفتح في Excel!');
+      }
+    }
+
+    // ==================== INTERACTIVE EVENT HANDLERS ====================
+    function initEvents() {
+      // Tab switching
+      document.querySelectorAll('.tab-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+          switchTab(btn.getAttribute('data-tab'));
+        });
+      });
+
+      // Dashboard filter & export buttons
+      document.getElementById('dashboardShiftFilter').addEventListener('change', renderDashboard);
+      document.getElementById('dashQuickExportExcelBtn').addEventListener('click', exportSessionsToExcel);
+      document.getElementById('exportFullExcelBtn').addEventListener('click', exportSessionsToExcel);
+      document.getElementById('dashQuickExportPdfBtn').addEventListener('click', () => {
+        window.print();
+      });
+      document.getElementById('exportFullPdfBtn').addEventListener('click', () => {
+        window.print();
+      });
+
+      // Alert banner buttons
+      document.getElementById('alertGoToCaptureBtn').addEventListener('click', () => {
+        appState.activeSessionId = 'HM-001-20261117-0800';
+        appState.activeScreenIdx = 3; // Screen 4 Pending
+        switchTab('capture');
+      });
+      document.getElementById('alertDismissBtn').addEventListener('click', () => {
+        document.getElementById('alertBanner').classList.add('hidden');
+      });
+
+      // Simulate Reminder
+      document.getElementById('simulateReminderBtn').addEventListener('click', () => {
+        const banner = document.getElementById('alertBanner');
+        banner.classList.remove('hidden');
+        document.getElementById('alertBannerTag').textContent = '🔔 تذكير دوري (Every 2 Hours)';
+        document.getElementById('alertBannerMessage').textContent =
+          'حان موعد جلسة المراقبة المجدولة للماكينة Haitian M01 (فترة السماح: 15 دقيقة). يرجى تصوير الشاشات الإلزامية وتأكيد قراءات الـ OCR.';
+        showToast('تم إطلاق تنبيه جلسة المراقبة الدورية (2-Hour Reminder)!', '🔔');
+      });
+
+      // Android Modal
+      document.getElementById('installAndroidGuideBtn').addEventListener('click', () => {
+        document.getElementById('androidModal').classList.remove('hidden');
+      });
+      document.getElementById('closeAndroidModalBtn').addEventListener('click', () => {
+        document.getElementById('androidModal').classList.add('hidden');
+      });
+      document.getElementById('closeAndroidModalBtn2').addEventListener('click', () => {
+        document.getElementById('androidModal').classList.add('hidden');
+      });
+
+      // Session Select in Capture Tab
+      document.getElementById('captureSessionSelect').addEventListener('change', (e) => {
+        appState.activeSessionId = e.target.value;
+        appState.activeScreenIdx = 0;
+        renderCaptureWorkspace();
+      });
+
+      // Add Extra Screen (Screen 5 / 6+)
+      document.getElementById('addExtraScreenBtn').addEventListener('click', () => {
+        const sess = getActiveSession();
+        const nextNum = sess.screens.length + 1;
+        const isFifth = nextNum === 5;
+        sess.screens.push({
+          screenIndex: nextNum,
+          id: isFifth ? 'SCR-PLAST' : `SCR-AUX-${nextNum}`,
+          nameAr: isFifth ? 'شاشة التلدين ومعاملات الحلزون' : `شاشة إضافية (${nextNum}) - طرد المنتج والقلب`,
+          nameEn: isFifth ? 'Plasticizing and screw parameters screen' : `Additional Screen #${nextNum} (Ejector & Core Pull)`,
+          mandatory: isFifth,
+          captured: false,
+          verified: false,
+          capturedAt: '--:--:--',
+          imgHash: `PENDING-S${nextNum}`,
+          note: '',
+          readings: {}
+        });
+        appState.activeScreenIdx = sess.screens.length - 1;
+        renderCaptureWorkspace();
+        showToast(`تمت إضافة الشاشة رقم ${nextNum} إلى الجلسة الحالية!`);
+      });
+
+      // Camera File Input (Real Camera or Image File)
+      document.getElementById('cameraFileInput').addEventListener('change', (e) => {
+        const file = e.target.files && e.target.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = (ev) => {
+          const sess = getActiveSession();
+          const scr = sess.screens[appState.activeScreenIdx];
+          scr.customImageDataUrl = ev.target.result;
+          scr.captured = true;
+          scr.capturedAt = new Date().toTimeString().slice(0, 8);
+          scr.imgHash = `CAM-${Math.random().toString(16).substring(2, 8).toUpperCase()}`;
+          document.getElementById('duplicateWarningBox').classList.add('hidden');
+          renderCaptureWorkspace();
+          showToast(`تم التقاط صورة "${scr.nameAr}" واستخراج معاملات الـ OCR للمراجعة!`);
+        };
+        reader.readAsDataURL(file);
+      });
+
+      // Simulate Capture & OCR Extraction
+      document.getElementById('simulateCaptureOcrBtn').addEventListener('click', () => {
+        const sess = getActiveSession();
+        const scr = sess.screens[appState.activeScreenIdx];
+        scr.captured = true;
+        scr.capturedAt = new Date().toTimeString().slice(0, 8);
+        scr.imgHash = `HMI-${sess.timeSlot.replace(':', '')}-S${scr.screenIndex}-${Math.floor(100 + Math.random() * 899)}`;
+        document.getElementById('duplicateWarningBox').classList.add('hidden');
+        renderCaptureWorkspace();
+        showToast(`تم تصوير "${scr.nameAr}" واستخراج القيم آلياً عبر OCR! يرجى مراجعتها والضغط على تأكيد.`, '📸');
+      });
+
+      // Retake Photo
+      document.getElementById('retakePhotoBtn').addEventListener('click', () => {
+        const sess = getActiveSession();
+        const scr = sess.screens[appState.activeScreenIdx];
+        scr.customImageDataUrl = null;
+        scr.captured = true;
+        scr.verified = false;
+        scr.capturedAt = new Date().toTimeString().slice(0, 8);
+        scr.imgHash = `RETAKE-${Math.floor(1000 + Math.random() * 8999)}`;
+        document.getElementById('duplicateWarningBox').classList.add('hidden');
+        sess.auditTrail.push({
+          time: scr.capturedAt,
+          user: sess.operator,
+          action: `إعادة تصوير الشاشة ${scr.screenIndex} (${scr.nameAr}) وتحديث بصمة الصورة.`
+        });
+        renderCaptureWorkspace();
+        showToast(`تمت إعادة تصوير الشاشة ${scr.screenIndex} وتوليد قراءة OCR جديدة.`, '🔄');
+      });
+
+      // Test Duplicate Guard
+      document.getElementById('testDuplicateGuardBtn').addEventListener('click', () => {
+        const box = document.getElementById('duplicateWarningBox');
+        box.classList.remove('hidden');
+        showToast('تم رصد ومنع تكرار غير مقصود لشاشة تم تصويرها مسبقاً!', '🛡️');
+      });
+
+      // Verify & Auto-Advance to Next Screen
+      document.getElementById('verifyAndAdvanceBtn').addEventListener('click', () => {
+        const sess = getActiveSession();
+        const scr = sess.screens[appState.activeScreenIdx];
+        scr.captured = true;
+        scr.verified = true;
+        if (scr.capturedAt === '--:--:--' || scr.capturedAt === '--') {
+          scr.capturedAt = new Date().toTimeString().slice(0, 8);
+        }
+        if (scr.imgHash.startsWith('PENDING') || scr.imgHash === 'MISSING') {
+          scr.imgHash = `VER-${sess.timeSlot.replace(':', '')}-S${scr.screenIndex}`;
+        }
+        scr.note = document.getElementById('operatorScreenNoteInput').value || 'تم التحقق والمطابقة بواسطة المشغل';
+
+        sess.auditTrail.push({
+          time: new Date().toTimeString().slice(0, 8),
+          user: sess.operator,
+          action: `تأكيد واعتماد قراءات الشاشة ${scr.screenIndex} (${scr.nameAr}).`
+        });
+
+        const st = getSessionCompletionStats(sess);
+        if (st.isFullyCapturedAndVerified) {
+          sess.sessionStatus = 'COMPLETED';
+          showToast(`اكتملت جميع الشاشات الإلزامية للجلسة ${sess.sessionId} بنسبة 100%!`, '🎉');
+        } else {
+          // Move automatically to next pending screen
+          const nextPending = sess.screens.findIndex((s, idx) => idx > appState.activeScreenIdx && (!s.captured || !s.verified));
+          const fallbackPending = sess.screens.findIndex(s => !s.captured || !s.verified);
+          if (nextPending !== -1) {
+            appState.activeScreenIdx = nextPending;
+          } else if (fallbackPending !== -1) {
+            appState.activeScreenIdx = fallbackPending;
+          } else if (appState.activeScreenIdx + 1 < sess.screens.length) {
+            appState.activeScreenIdx++;
+          }
+          showToast(`تم اعتماد الشاشة ${scr.screenIndex} والانتقال تلقائياً إلى الشاشة التالية!`);
+        }
+
+        renderCaptureWorkspace();
+      });
+
+      // Prev / Next Screen Buttons
+      document.getElementById('prevScreenBtn').addEventListener('click', () => {
+        const sess = getActiveSession();
+        appState.activeScreenIdx = (appState.activeScreenIdx - 1 + sess.screens.length) % sess.screens.length;
+        renderCaptureWorkspace();
+      });
+      document.getElementById('nextScreenBtn').addEventListener('click', () => {
+        const sess = getActiveSession();
+        appState.activeScreenIdx = (appState.activeScreenIdx + 1) % sess.screens.length;
+        renderCaptureWorkspace();
+      });
+
+      // New Session Button on Dashboard
+      document.getElementById('openNewSessionModalBtn').addEventListener('click', () => {
+        const newId = `HM-001-20261117-1000`;
+        const existing = appState.sessions.find(s => s.sessionId === newId);
+        if (!existing) {
+          appState.sessions.push({
+            sessionId: newId,
+            machine: 'Haitian M01',
+            controller: 'Haitian Mars III (KEBA)',
+            product: 'Plastic Bumper',
+            mold: 'Bumper Mold 01',
+            timeSlot: '10:00',
+            date: '2026-11-17',
+            shift: 'Shift A',
+            operator: 'م. أحمد خالد (OP-104)',
+            sessionStatus: 'IN_PROGRESS',
+            hasDeviation: false,
+            alarms: [],
+            auditTrail: [
+              { time: '10:00:05', user: 'OP-104', action: 'فتح جلسة المراقبة المجدولة للساعة 10:00.' }
+            ],
+            screens: APPROVED_RECIPE.screens.map(r => ({
+              screenIndex: r.screenIndex,
+              id: r.id,
+              nameAr: r.nameAr,
+              nameEn: r.nameEn,
+              mandatory: true,
+              captured: false,
+              verified: false,
+              capturedAt: '--:--:--',
+              imgHash: `PENDING-1000-S${r.screenIndex}`,
+              note: '',
+              readings: {}
+            }))
+          });
+        }
+        appState.activeSessionId = newId;
+        appState.activeScreenIdx = 0;
+        switchTab('capture');
+        showToast(`تم فتح الجلسة الجديدة ${newId} وبدء تسلسل التصوير الموجه!`);
+      });
+
+      // Schedule Configurator
+      document.getElementById('applyScheduleConfigBtn').addEventListener('click', () => {
+        const interval = parseInt(document.getElementById('adminIntervalSelect').value, 10) || 2;
+        const grace = parseInt(document.getElementById('adminGracePeriodSelect').value, 10) || 15;
+        const startStr = document.getElementById('adminStartHourInput').value || '06:00';
+        const endStr = document.getElementById('adminEndHourInput').value || '20:00';
+
+        const startH = parseInt(startStr.split(':')[0], 10);
+        const endH = parseInt(endStr.split(':')[0], 10);
+        const slots = [];
+        for (let h = startH; h <= endH; h += interval) {
+          slots.push(`${String(h).padStart(2, '0')}:00`);
+        }
+        if (slots.length > 0) {
+          appState.intervalHours = interval;
+          appState.gracePeriodMinutes = grace;
+          appState.scheduleSlots = slots;
+          document.getElementById('nextSlotCountdown').textContent = `الفاصل: كل ${interval} س (فترة سماح ${grace} د)`;
+          renderScheduleAndReminders();
+          showToast(`تم تحديث جدول المراقبة: كل ${interval} ساعات (${slots.length} جلسات يومياً) وفترة سماح ${grace} دقيقة.`);
+        }
+      });
+
+      // Simulate Overdue Session
+      document.getElementById('simulateOverdueBtn').addEventListener('click', () => {
+        const newRem = {
+          id: `REM-0${appState.reminders.length + 1}`,
+          type: 'OVERDUE',
+          time: '10:00',
+          graceUntil: `10:${appState.gracePeriodMinutes}`,
+          sessionId: 'HM-003-20261117-1000',
+          machine: 'Haitian M03',
+          operator: 'فني/ سامح حسن (OP-302)',
+          status: 'MISSED_RECORDED',
+          note: 'تجاوز المهلة المحددة دون إتمام التصوير. تم تسجيل الجلسة المتأخرة باسم المشغل والماكينة في لوحة الامتثال (دون تصنيفها كانحراف صناعي).'
+        };
+        appState.reminders.unshift(newRem);
+        renderScheduleAndReminders();
+        showToast('تم تسجيل جلسة فائتة (Overdue) وإشعار المشغل المسؤول في السجل!', '⚠️');
+      });
+
+      // Comparison Mode Selector
+      document.getElementById('comparisonModeSelect').addEventListener('change', renderComparisonEngine);
+    }
+
+    // Live Clock Ticker
+    setInterval(() => {
+      const now = new Date();
+      const el = document.getElementById('liveClockDisplay');
+      if (el) el.textContent = now.toTimeString().slice(0, 8);
+    }, 1000);
+
+    window.addEventListener('DOMContentLoaded', () => {
+      initEvents();
+      renderDashboard();
+    });
+  </script>
+</body>
+</html>
